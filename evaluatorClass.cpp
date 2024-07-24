@@ -19,7 +19,8 @@ public:
     DeltaEvaluator(std::vector<ArmTemplate>& arms):
         Evaluator<ArmTemplate,RewardTemplate>(arms),
         optimalArm(*std::max_element(arms.begin(),arms.end(),[](ArmTemplate& a, ArmTemplate& b){return a.getMean() < b.getMean();})){
-        std::cout<<"DeltaEvaluator constructor"<<"\n";
+        std::cout<<"DeltaEvaluator constructor"<<"\t";
+        std::cout<<"Optimal Arm Mean: "<<this->optimalArm.getMean()<<"\n";
     };
     
     RewardTemplate evaluateRegret(std::vector<ArmTemplate>& arms, ArmTemplate& selectedArm) override {
