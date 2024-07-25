@@ -6,9 +6,9 @@ template <typename ArmTemplate, typename RewardTemplate>
 class ArmSelector{
 protected: 
     std::vector<ArmTemplate> arms;
+public:    
     std::vector<ArmTemplate> pastArms;
     std::vector<RewardTemplate> pastRewards;
-public:    
     ArmSelector(std::vector<ArmTemplate>& arms){
         this->arms = arms;
         this->pastArms = std::vector<ArmTemplate>();
@@ -17,7 +17,6 @@ public:
     virtual ArmTemplate selectArm() = 0;
     virtual RewardTemplate playArm(ArmTemplate& arm){
         RewardTemplate reward = arm.getReward();
-        // std::cout<<"Reward: "<<reward<<"\n";
         updateMemory(arm,reward);
         return reward;
     };
@@ -50,7 +49,7 @@ public:
 template <typename ArmTemplate, typename RewardTemplate> 
 class UniformAllocator : public ArmSelector<ArmTemplate, RewardTemplate>{
 public: 
-    UniformAllocator(std::vector<ArmTemplate>& arms):ArmSelector<ArmTemplate, RewardTemplate>(arms){};
+    UniformAllocator(std::vector<ArmTemplate>& arms, std::mt19937& generator):ArmSelector<ArmTemplate, RewardTemplate>(arms){};
     ArmTemplate selectArm() override {
         std::cout<<"UniformAllocator selectArm"<<"\t";
         int selectedIndex = this->pastArms.size()%this->arms.size();

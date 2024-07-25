@@ -7,7 +7,9 @@ class Arm{
 protected: 
     std::mt19937* generatorptr;
 public: 
-    Arm(std::mt19937& generator){
+    int id; 
+    Arm(std::mt19937& generator, int id){
+        this->id=id;
         this->generatorptr = &generator;
     }
     virtual RewardTemplate getReward() = 0;
@@ -17,7 +19,7 @@ class RandomGaussianArm: public Arm<double>{
     double mean; 
     double stdDev;
 public:
-    RandomGaussianArm(std::mt19937& generator):Arm<double>(generator){
+    RandomGaussianArm(std::mt19937& generator, int id):Arm<double>(generator,id){
         std::cout<<"RandomGaussianArm Constructor"<<"\t";
         setMean();
         setStdDev();
