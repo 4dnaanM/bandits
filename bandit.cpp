@@ -1,3 +1,7 @@
+#include <iostream>
+#include <vector>
+#include <random>
+
 template <typename ArmTemplate, typename RewardTemplate, typename AllocatorTemplate, typename EvaluatorTemplate>
 class banditAlgorithm{
 protected:
