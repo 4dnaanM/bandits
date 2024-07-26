@@ -1,6 +1,5 @@
 #include <random>
-#include <iostream>
-#include <vector> 
+#include <iostream> 
 
 template <typename RewardTemplate>
 class Arm{
