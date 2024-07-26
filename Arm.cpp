@@ -19,16 +19,14 @@ class RandomGaussianArm: public Arm<double>{
     double stdDev;
 public:
     RandomGaussianArm(std::mt19937& generator, int id):Arm<double>(generator,id){
-        std::cout<<"RandomGaussianArm Constructor"<<"\t";
         setMean();
         setStdDev();
-        std::cout<<"Mean: "<<this->mean<<"\t"<<"StdDev: "<<this->stdDev<<"\n";
+        std::cout<<"RandomGaussianArm Mean: "<<this->mean<<" "<<"StdDev: "<<this->stdDev<<"\n";
     };
     double getReward() override {;
-        std::cout<<"RandomGaussianArm getReward"<<"\t";
         std::normal_distribution<double> gaussian(this->mean,this->stdDev);
         double reward = gaussian(*(this->generatorptr));
-        std::cout<<"Reward: "<<reward<<"\n";
+        std::cout<<"RandomGaussianArm reward: "<<reward<<"\n";
         return reward;
     }
     double getMean(){

@@ -42,10 +42,9 @@ public:
     };
     
     ArmTemplate selectArm() override {
-        std::cout<<"RandomArmSelector selectArm"<<"\t";
         std::uniform_int_distribution<int> uniform(0,(*(this->armsptr)).size()-1);
         ArmTemplate selectedArm = this->getArm(uniform(*(this->generatorptr)));
-        std::cout<<"Selected Arm: "<<selectedArm.id<<"\n";
+        std::cout<<"Random ArmSelector selected Arm: "<<selectedArm.id<<" | ";
         return selectedArm;
     }
 };
@@ -55,10 +54,9 @@ class UniformAllocator : public ArmSelector<ArmTemplate, RewardTemplate>{
 public: 
     UniformAllocator(std::unordered_map<int,ArmTemplate>& arms, std::mt19937& generator):ArmSelector<ArmTemplate, RewardTemplate>(arms){};
     ArmTemplate selectArm() override {
-        std::cout<<"UniformAllocator selectArm"<<"\t";
         int selectedIndex = this->pastArms.size()%(*(this->armsptr)).size();
         ArmTemplate selectedArm = this->getArm(selectedIndex);
-        std::cout<<"Selected Arm: "<<selectedArm.id<<"\n";
+        std::cout<<"UniformAllocator selected Arm: "<<selectedArm.id<<" | ";
         return selectedArm;
     }
 };

@@ -35,11 +35,11 @@ public:
     virtual void run(){
         std::cout<<"\n";
         for(int i = 0; i< this->BUDGET; i++){
-            std::cout<<"ROUND: "<<i<<"\n";
+            std::cout<<"ROUND: "<<i<<" | ";
             ArmTemplate selectedArm = this->armSelectorInstance.selectArm();
             RewardTemplate reward = this->armSelectorInstance.playArm(selectedArm);
-            std::cout<<"\n";
         }
+        std::cout<<"\n";
     }
 
     virtual ArmTemplate findBestArm(){
@@ -74,7 +74,6 @@ public:
             logK+=1/i;
         }
         this->C = (this->BUDGET-this->ARMS)/logK;
-        std::cout<<"C: "<<this->C<<"\n";
     }
     ArmTemplate findWorstArm(int endIndex, int phaseLength){
         std::unordered_map<int,RewardTemplate> rewardsforArm;
@@ -92,16 +91,20 @@ public:
         return this->arms.find(worstArmIndex)->second;
     }
     void run(){
+        std::cout<<"\n";
         for(int PHASE = 1; PHASE <= this->ARMS -1; PHASE++){
-            int length = ceil(this->C/this->arms.size());
-            std::cout<<"Phase "<<PHASE<<" with length "<<length<<"\n";
-            for(int i = 0; i< length; i++){
-                std::cout<<"ROUND: "<<i<<"\n";
-                int run_length = ceil(this->C/this->arms.size());
-                ArmTemplate selectedArm = this->armSelectorInstance.selectArm();
-                RewardTemplate reward = this->armSelectorInstance.playArm(selectedArm);
+            int length = ceil(this->C/this->arms.size())-((PHASE>1)?ceil(this->C/(this->arms.size()+1)):0);
+            std::cout<<"Phase "<<PHASE<<" with length "<<length<<"*"<<this->arms.size()<<" = "<<length*this->arms.size()<<"\n";
+            if(length==0) continue; 
+            for(auto p: this->arms){
+                int id = p.first; 
+                ArmTemplate arm = p.second;
+                std::cout<<"Playing Arm "<<id<<std::endl;
+                for(int i = 0; i< length; i++){
+                    std::cout<<"ROUND: "<<i<<" | ";
+                    RewardTemplate reward = this->armSelectorInstance.playArm(arm);
+                }
             }
-            std::cout<<"Finding Worst Arm:\n";
             ArmTemplate worstArm = findWorstArm(this->armSelectorInstance.pastRewards.size()-1,length);
             this->arms.erase(worstArm.id);
             std::cout<<"Removed Worst Arm: "<<worstArm.id<<"\n";

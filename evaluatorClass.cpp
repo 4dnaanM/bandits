@@ -2,14 +2,6 @@
 #include <unordered_map> 
 #include <vector>
 
-template <typename ArmTemplate>
-class OptimalArmComp{
-public:
-    bool operator()(std::pair<const int,ArmTemplate>& a, std::pair<const int,ArmTemplate>& b){
-        return a.second.getMean() < b.second.getMean();
-    }
-};
-
 template <typename ArmTemplate,typename RewardTemplate>
 class Evaluator{
 protected: 
@@ -27,15 +19,13 @@ class DeltaEvaluator : public Evaluator<ArmTemplate,RewardTemplate>{
 public:
     DeltaEvaluator(std::unordered_map<int,ArmTemplate>& arms):
         Evaluator<ArmTemplate,RewardTemplate>(arms),
-        optimalArm(std::max_element((*(this->armsptr)).begin(),(*(this->armsptr)).end(),OptimalArmComp<ArmTemplate>())->second){
-        std::cout<<"DeltaEvaluator constructor"<<"\t";
+        optimalArm(std::max_element((*(this->armsptr)).begin(),(*(this->armsptr)).end(),[](std::pair<const int,ArmTemplate>& a, std::pair<const int,ArmTemplate>& b){return a.second.getMean() < b.second.getMean();})->second){
         std::cout<<"Optimal Arm is Arm "<<optimalArm.id<<" with Mean: "<<this->optimalArm.getMean()<<"\n";
     };
     
     RewardTemplate evaluateRegret(ArmTemplate& selectedArm) override {
-        std::cout<<"DeltaEvaluator evaluateRegret"<<"\t";
         RewardTemplate regret = this->optimalArm.getMean() - selectedArm.getMean();
-        std::cout<<"Regret: "<<regret<<"\n";
+        std::cout<<"DeltaEvaluator regret: "<<regret<<"\n";
         return regret;
     }
 };
