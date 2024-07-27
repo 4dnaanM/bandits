@@ -10,6 +10,8 @@ protected:
 public:    
     std::vector<int> pastArms;
     std::vector<RewardTemplate> pastRewards;
+    std::map<int,RewardTemplate> totalRewards;
+    std::map<int,int> totalPulls;
     
     ArmSelector(std::map<int,ArmTemplate>& arms){
         this->armsptr = &arms;
@@ -25,6 +27,8 @@ public:
     void updateMemory(ArmTemplate& selectedArm, RewardTemplate& reward){
         this->pastArms.push_back(selectedArm.id);
         this->pastRewards.push_back(reward);
+        this->totalRewards[selectedArm.id]+=reward;
+        this->totalPulls[selectedArm.id]+=1;
     }
     ArmTemplate getArm(int position){
         auto it = (*(this->armsptr)).begin();

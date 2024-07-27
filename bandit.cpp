@@ -43,15 +43,9 @@ public:
     }
 
     virtual ArmTemplate findBestArm(){
-        std::map<int,RewardTemplate> rewardsForArm;
-        std::map<int,int> timesArmPulled;
-        for(int i = 0; i<this->BUDGET; i++){
-            rewardsForArm[this->armSelectorInstance.pastArms[i]]+=this->armSelectorInstance.pastRewards[i];
-            timesArmPulled[this->armSelectorInstance.pastArms[i]]+=1;
-        }
         std::map<int,RewardTemplate> averageRewards;
         for(int i = 0; i<this->ARMS; i++){
-            averageRewards[i] = timesArmPulled[i]>0? rewardsForArm[i]/timesArmPulled[i]: INT_MIN;
+            averageRewards[i] = this->armSelectorInstance.totalPulls[i]>0? this->armSelectorInstance.totalRewards[i]/this->armSelectorInstance.totalPulls[i]: INT_MIN;
         }
         int bestArmIndex = std::max_element(averageRewards.begin(),averageRewards.end(),[](std::pair<const int,RewardTemplate>& a, std::pair<const int,RewardTemplate>& b){return a.second < b.second;})->first;
         return this->arms.find(bestArmIndex)->second;
@@ -76,16 +70,10 @@ public:
         this->C = (this->BUDGET-this->ARMS)/logK;
     }
     ArmTemplate findWorstArm(int endIndex, int phaseLength){
-        std::map<int,RewardTemplate> rewardsForArm;
-        std::map<int,int> timesArmPulled;
-        for(int i = endIndex-phaseLength*this->arms.size()+1; i<=endIndex; i++){
-            rewardsForArm[this->armSelectorInstance.pastArms[i]]+=this->armSelectorInstance.pastRewards[i];
-            timesArmPulled[this->armSelectorInstance.pastArms[i]]+=1;
-        }
         std::map<int,RewardTemplate> averageRewards;
-        for(auto p : rewardsForArm){
-            int id = p.first;
-            averageRewards[id] = timesArmPulled[id]>0? rewardsForArm[id]/timesArmPulled[id]: INT_MIN;
+        for(auto p : this->arms){
+            int id = p.second;
+            averageRewards[id] = this->armSelectorInstance.totalPulls[id]>0? this->armSelectorInstance.totalRewards[id]/this->armSelectorInstance.totalPulls[id]: INT_MIN;
         }
         int worstArmIndex = std::min_element(averageRewards.begin(),averageRewards.end(),[](std::pair<const int,RewardTemplate>& a, std::pair<const int,RewardTemplate>& b){return a.second < b.second;})->first;
         return this->arms.find(worstArmIndex)->second;
@@ -107,6 +95,8 @@ public:
             }
             ArmTemplate worstArm = findWorstArm(this->armSelectorInstance.pastRewards.size()-1,length);
             this->arms.erase(worstArm.id);
+            this->armSelectorInstance.totalPulls.clear();
+            this->armSelectorInstance.totalRewards.clear();
             std::cout<<"Removed Worst Arm: "<<worstArm.id<<"\n";
             std::cout<<"\n";
         }
@@ -120,6 +110,33 @@ public:
         ArmTemplate bestArm = this->arms.begin()->second;
         std::cout<<"Final Remaining Arm: "<<bestArm.id<<"\n";
         return this->evaluatorInstance.evaluateRegret(bestArm);
+    }
+};
+
+template <typename ArmTemplate, typename RewardTemplate, typename AllocatorTemplate, typename EvaluatorTemplate>
+class UCB_2: public banditAlgorithm<ArmTemplate,RewardTemplate,AllocatorTemplate,EvaluatorTemplate>{
+    double a;
+public: 
+    UCB_2(int ARMS, int BUDGET, std::mt19937& generator, double a): banditAlgorithm<ArmTemplate,RewardTemplate,AllocatorTemplate,EvaluatorTemplate>(ARMS,BUDGET,generator) {
+        this->a = a;
+    }
+    ArmTemplate getNextArm(){
+        std::map<int,RewardTemplate> comparator;
+        for(int i = 0; i<this->ARMS; i++){
+            comparator[i] = this->armSelectorInstance.totalPulls[i]>0? (this->armSelectorInstance.totalRewards[i]/this->armSelectorInstance.totalPulls[i]+sqrt(a/this->armSelectorInstance.totalPulls[i])): INT_MAX;
+        }
+        int bestArmIndex = std::max_element(comparator.begin(),comparator.end(),[](std::pair<const int,RewardTemplate>& a, std::pair<const int,RewardTemplate>& b){return a.second < b.second;})->first;
+        std::cout<<"UCB_E selected Arm: "<<bestArmIndex<<" | ";
+        return this->arms.find(bestArmIndex)->second;
+    }
+    void run(){
+        std::cout<<"\n";
+        for(int i = 0; i< this->BUDGET; i++){
+            std::cout<<"ROUND: "<<i<<" | ";
+            ArmTemplate selectedArm = getNextArm();
+            RewardTemplate reward = this->armSelectorInstance.playArm(selectedArm);
+        }
+        std::cout<<"\n";
     }
 };
 // has k-1 phases
