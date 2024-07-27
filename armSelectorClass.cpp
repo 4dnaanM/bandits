@@ -1,18 +1,19 @@
 #include <iostream>
 #include <vector>
 #include <random>
-#include <unordered_map> 
+#include <map> 
 
 template <typename ArmTemplate, typename RewardTemplate>
 class ArmSelector{
 protected: 
-    std::unordered_map<int,ArmTemplate>* armsptr;
+    std::map<int,ArmTemplate>* armsptr;
 public:    
-    std::vector<ArmTemplate> pastArms;
+    std::vector<int> pastArms;
     std::vector<RewardTemplate> pastRewards;
-    ArmSelector(std::unordered_map<int,ArmTemplate>& arms){
+    
+    ArmSelector(std::map<int,ArmTemplate>& arms){
         this->armsptr = &arms;
-        this->pastArms = std::vector<ArmTemplate>();
+        this->pastArms = std::vector<int>();
         this->pastRewards = std::vector<RewardTemplate>();
     };
     virtual ArmTemplate selectArm() = 0;
@@ -22,7 +23,7 @@ public:
         return reward;
     };
     void updateMemory(ArmTemplate& selectedArm, RewardTemplate& reward){
-        this->pastArms.push_back(selectedArm);
+        this->pastArms.push_back(selectedArm.id);
         this->pastRewards.push_back(reward);
     }
     ArmTemplate getArm(int position){
@@ -37,7 +38,7 @@ class RandomArmSelector : public ArmSelector<ArmTemplate, RewardTemplate>{
 private: 
     std::mt19937* generatorptr;
 public:
-    RandomArmSelector(std::unordered_map<int,ArmTemplate>& arms,std::mt19937& generator):ArmSelector<ArmTemplate, RewardTemplate>(arms){
+    RandomArmSelector(std::map<int,ArmTemplate>& arms,std::mt19937& generator):ArmSelector<ArmTemplate, RewardTemplate>(arms){
         this->generatorptr = &generator;
     };
     
@@ -52,7 +53,7 @@ public:
 template <typename ArmTemplate, typename RewardTemplate> 
 class UniformAllocator : public ArmSelector<ArmTemplate, RewardTemplate>{
 public: 
-    UniformAllocator(std::unordered_map<int,ArmTemplate>& arms, std::mt19937& generator):ArmSelector<ArmTemplate, RewardTemplate>(arms){};
+    UniformAllocator(std::map<int,ArmTemplate>& arms, std::mt19937& generator):ArmSelector<ArmTemplate, RewardTemplate>(arms){};
     ArmTemplate selectArm() override {
         int selectedIndex = this->pastArms.size()%(*(this->armsptr)).size();
         ArmTemplate selectedArm = this->getArm(selectedIndex);

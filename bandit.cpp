@@ -1,14 +1,14 @@
 #include <iostream>
 #include <vector>
 #include <random>
-#include <unordered_map> 
+#include <map> 
 
 template <typename ArmTemplate, typename RewardTemplate, typename AllocatorTemplate, typename EvaluatorTemplate>
 class banditAlgorithm{
 protected:
     int ARMS; 
     int BUDGET; 
-    std::unordered_map<int,ArmTemplate> arms;
+    std::map<int,ArmTemplate> arms;
     std::mt19937* generatorptr;
     AllocatorTemplate armSelectorInstance;
     EvaluatorTemplate evaluatorInstance;
@@ -23,8 +23,8 @@ public:
         evaluatorInstance(arms)
     {}
     
-    virtual std::unordered_map<int,ArmTemplate> createArms(int ARMS, std::mt19937* generatorptr){
-        std::unordered_map<int,ArmTemplate> localArms;
+    virtual std::map<int,ArmTemplate> createArms(int ARMS, std::mt19937* generatorptr){
+        std::map<int,ArmTemplate> localArms;
         for(int i = 0; i<ARMS; i++){
             localArms.emplace(i,ArmTemplate(*(generatorptr),i));
         }
@@ -43,15 +43,15 @@ public:
     }
 
     virtual ArmTemplate findBestArm(){
-        std::unordered_map<int,RewardTemplate> rewardsforArm;
-        std::unordered_map<int,int> timesArmPulled;
+        std::map<int,RewardTemplate> rewardsForArm;
+        std::map<int,int> timesArmPulled;
         for(int i = 0; i<this->BUDGET; i++){
-            rewardsforArm[this->armSelectorInstance.pastArms[i].id]+=this->armSelectorInstance.pastRewards[i];
-            timesArmPulled[this->armSelectorInstance.pastArms[i].id]+=1;
+            rewardsForArm[this->armSelectorInstance.pastArms[i]]+=this->armSelectorInstance.pastRewards[i];
+            timesArmPulled[this->armSelectorInstance.pastArms[i]]+=1;
         }
-        std::unordered_map<int,RewardTemplate> averageRewards;
+        std::map<int,RewardTemplate> averageRewards;
         for(int i = 0; i<this->ARMS; i++){
-            averageRewards[i] = timesArmPulled[i]>0? rewardsforArm[i]/timesArmPulled[i]: INT_MIN;
+            averageRewards[i] = timesArmPulled[i]>0? rewardsForArm[i]/timesArmPulled[i]: INT_MIN;
         }
         int bestArmIndex = std::max_element(averageRewards.begin(),averageRewards.end(),[](std::pair<const int,RewardTemplate>& a, std::pair<const int,RewardTemplate>& b){return a.second < b.second;})->first;
         return this->arms.find(bestArmIndex)->second;
@@ -76,16 +76,16 @@ public:
         this->C = (this->BUDGET-this->ARMS)/logK;
     }
     ArmTemplate findWorstArm(int endIndex, int phaseLength){
-        std::unordered_map<int,RewardTemplate> rewardsforArm;
-        std::unordered_map<int,int> timesArmPulled;
-        for(int i = endIndex-phaseLength+1; i<=endIndex; i++){
-            rewardsforArm[this->armSelectorInstance.pastArms[i].id]+=this->armSelectorInstance.pastRewards[i];
-            timesArmPulled[this->armSelectorInstance.pastArms[i].id]+=1;
+        std::map<int,RewardTemplate> rewardsForArm;
+        std::map<int,int> timesArmPulled;
+        for(int i = endIndex-phaseLength*this->arms.size()+1; i<=endIndex; i++){
+            rewardsForArm[this->armSelectorInstance.pastArms[i]]+=this->armSelectorInstance.pastRewards[i];
+            timesArmPulled[this->armSelectorInstance.pastArms[i]]+=1;
         }
-        std::unordered_map<int,RewardTemplate> averageRewards;
-        for(auto p : rewardsforArm){
+        std::map<int,RewardTemplate> averageRewards;
+        for(auto p : rewardsForArm){
             int id = p.first;
-            averageRewards[id] = timesArmPulled[id]>0? rewardsforArm[id]/timesArmPulled[id]: INT_MIN;
+            averageRewards[id] = timesArmPulled[id]>0? rewardsForArm[id]/timesArmPulled[id]: INT_MIN;
         }
         int worstArmIndex = std::min_element(averageRewards.begin(),averageRewards.end(),[](std::pair<const int,RewardTemplate>& a, std::pair<const int,RewardTemplate>& b){return a.second < b.second;})->first;
         return this->arms.find(worstArmIndex)->second;

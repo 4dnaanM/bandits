@@ -12,7 +12,7 @@ int main(){
     std::cout<<"Testing bandit with "<<ARMS<<" arms and "<<BUDGET<<" budget\n\n";
     // banditAlgorithm<RandomGaussianArm,double,UniformAllocator<RandomGaussianArm,double>,DeltaEvaluator<RandomGaussianArm,double>> algorithmInstance(ARMS,BUDGET,generator);
     // banditAlgorithm<RandomGaussianArm,double,RandomArmSelector<RandomGaussianArm,double>,DeltaEvaluator<RandomGaussianArm,double>> algorithmInstance(ARMS,BUDGET,generator);
-    SuccessiveRejectsAlgorithm<RandomGaussianArm,double,RandomArmSelector<RandomGaussianArm,double>,DeltaEvaluator<RandomGaussianArm,double>> algorithmInstance(ARMS,BUDGET,generator);
+    SuccessiveRejectsAlgorithm<RandomGaussianArm,double,UniformAllocator<RandomGaussianArm,double>,DeltaEvaluator<RandomGaussianArm,double>> algorithmInstance(ARMS,BUDGET,generator);
     algorithmInstance.run();
     algorithmInstance.evaluate();
 

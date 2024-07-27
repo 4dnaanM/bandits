@@ -1,13 +1,13 @@
 #include <iostream>
-#include <unordered_map> 
+#include <map> 
 #include <vector>
 
 template <typename ArmTemplate,typename RewardTemplate>
 class Evaluator{
 protected: 
-    std::unordered_map<int,ArmTemplate>* armsptr;
+    std::map<int,ArmTemplate>* armsptr;
 public:    
-    Evaluator(std::unordered_map<int,ArmTemplate>& arms){
+    Evaluator(std::map<int,ArmTemplate>& arms){
         this->armsptr = &arms;
     }
     virtual RewardTemplate evaluateRegret(ArmTemplate& selectedArm) = 0;
@@ -17,7 +17,7 @@ template <typename ArmTemplate, typename RewardTemplate>
 class DeltaEvaluator : public Evaluator<ArmTemplate,RewardTemplate>{
     ArmTemplate optimalArm; 
 public:
-    DeltaEvaluator(std::unordered_map<int,ArmTemplate>& arms):
+    DeltaEvaluator(std::map<int,ArmTemplate>& arms):
         Evaluator<ArmTemplate,RewardTemplate>(arms),
         optimalArm(std::max_element((*(this->armsptr)).begin(),(*(this->armsptr)).end(),[](std::pair<const int,ArmTemplate>& a, std::pair<const int,ArmTemplate>& b){return a.second.getMean() < b.second.getMean();})->second){
         std::cout<<"Optimal Arm is Arm "<<optimalArm.id<<" with Mean: "<<this->optimalArm.getMean()<<"\n";
