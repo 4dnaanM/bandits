@@ -14,33 +14,58 @@ public:
     virtual RewardTemplate getReward() = 0;
 };
 
-class RandomGaussianArm: public Arm<double>{
-    double mean; 
-    double stdDev;
+template <typename RewardTemplate>
+class RandomGaussianArm: public Arm<RewardTemplate>{
+    RewardTemplate mean; 
+    RewardTemplate stdDev;
 public:
-    RandomGaussianArm(std::mt19937& generator, int id):Arm<double>(generator,id){
+    RandomGaussianArm(std::mt19937& generator, int id):Arm<RewardTemplate>(generator,id){
         setMean();
         setStdDev();
         std::cout<<"RandomGaussianArm Mean: "<<this->mean<<" "<<"StdDev: "<<this->stdDev<<"\n";
     };
-    double getReward() override {;
-        std::normal_distribution<double> gaussian(this->mean,this->stdDev);
-        double reward = gaussian(*(this->generatorptr));
+    RewardTemplate getReward() override {;
+        std::normal_distribution<RewardTemplate> gaussian(this->mean,this->stdDev);
+        RewardTemplate reward = gaussian(*(this->generatorptr));
         std::cout<<"RandomGaussianArm reward: "<<reward<<"\n";
         return reward;
     }
-    double getMean(){
+    RewardTemplate getMean(){
         return this->mean;
     }
-    double getStdDev(){
+    RewardTemplate getStdDev(){
         return this->stdDev;
     }
     void setMean(){
-        std::uniform_real_distribution<double> uniform(0,1);
+        std::uniform_real_distribution<RewardTemplate> uniform(0,1);
         this->mean = uniform(*(this->generatorptr));
     }
     void setStdDev(){
-        std::uniform_real_distribution<double> uniform(0,1);
+        std::uniform_real_distribution<RewardTemplate> uniform(0,1);
         this->stdDev = uniform(*(this->generatorptr));
+    }
+};
+
+template <typename RewardTemplate>
+class BernoulliArm: public Arm<RewardTemplate>{
+    RewardTemplate p; 
+public:
+    BernoulliArm(std::mt19937& generator, int id):Arm<RewardTemplate>(generator,id){
+        setMean();
+        std::cout<<"BernoulliArm p: "<<this->p<<"\n";
+    };
+    RewardTemplate getReward() override {;
+        std::uniform_real_distribution<RewardTemplate> uniform(0,1);
+        RewardTemplate sample = uniform(*(this->generatorptr));
+        RewardTemplate reward = sample<=this->p? 1: 0;
+        std::cout<<"BernoulliArm reward: "<<reward<<"\n";
+        return reward;
+    }
+    RewardTemplate getMean(){
+        return this->p;
+    }
+    void setMean(){
+        std::uniform_real_distribution<RewardTemplate> uniform(0,1);
+        this->p = uniform(*(this->generatorptr));
     }
 };

@@ -10,14 +10,17 @@ int main(){
     int BUDGET = 123;
     double a = 100;
     std::cout<<"Testing bandit with "<<ARMS<<" arms and "<<BUDGET<<" budget\n\n";
-    // banditAlgorithm<RandomGaussianArm,double,UniformAllocator<RandomGaussianArm,double>,DeltaEvaluator<RandomGaussianArm,double>> algorithmInstance(ARMS,BUDGET,generator);
-    // banditAlgorithm<RandomGaussianArm,double,RandomArmSelector<RandomGaussianArm,double>,DeltaEvaluator<RandomGaussianArm,double>> algorithmInstance(ARMS,BUDGET,generator);
-    // SuccessiveRejectsAlgorithm<RandomGaussianArm,double,UniformAllocator<RandomGaussianArm,double>,DeltaEvaluator<RandomGaussianArm,double>> algorithmInstance(ARMS,BUDGET,generator);
-    UCB_2<RandomGaussianArm,double,UniformAllocator<RandomGaussianArm,double>,DeltaEvaluator<RandomGaussianArm,double>> algorithmInstance(ARMS,BUDGET,generator,a);
+    // banditAlgorithm<RandomGaussianArm<double>,double,UniformAllocator<RandomGaussianArm<double>,double>,DeltaEvaluator<RandomGaussianArm<double>,double>> algorithmInstance(ARMS,BUDGET,generator);
+    // banditAlgorithm<RandomGaussianArm<double>,double,RandomArmSelector<RandomGaussianArm<double>,double>,DeltaEvaluator<RandomGaussianArm<double>,double>> algorithmInstance(ARMS,BUDGET,generator);
+    // SuccessiveRejectsAlgorithm<RandomGaussianArm<double>,double,UniformAllocator<RandomGaussianArm<double>,double>,DeltaEvaluator<RandomGaussianArm<double>,double>> algorithmInstance(ARMS,BUDGET,generator);
+    // UCB_2<RandomGaussianArm<double>,double,UniformAllocator<RandomGaussianArm<double>,double>,DeltaEvaluator<RandomGaussianArm<double>,double>> algorithmInstance(ARMS,BUDGET,generator,a);
+    // banditAlgorithm<BernoulliArm<double>,double,UniformAllocator<BernoulliArm<double>,double>,DeltaEvaluator<BernoulliArm<double>,double>> algorithmInstance(ARMS,BUDGET,generator);
+    // banditAlgorithm<BernoulliArm<double>,double,RandomArmSelector<BernoulliArm<double>,double>,DeltaEvaluator<BernoulliArm<double>,double>> algorithmInstance(ARMS,BUDGET,generator);
+    SuccessiveRejectsAlgorithm<BernoulliArm<double>,double,UniformAllocator<BernoulliArm<double>,double>,DeltaEvaluator<BernoulliArm<double>,double>> algorithmInstance(ARMS,BUDGET,generator);
+    // UCB_2<BernoulliArm<double>,double,UniformAllocator<BernoulliArm<double>,double>,DeltaEvaluator<BernoulliArm<double>,double>> algorithmInstance(ARMS,BUDGET,generator,a);
     algorithmInstance.run();
     algorithmInstance.evaluate();
 
     return 0;
 }
-
-// DO: UCB
+// make skeleton 

@@ -72,13 +72,13 @@ public:
     ArmTemplate findWorstArm(int endIndex, int phaseLength){
         std::map<int,RewardTemplate> averageRewards;
         for(auto p : this->arms){
-            int id = p.second;
+            int id = p.first;
             averageRewards[id] = this->armSelectorInstance.totalPulls[id]>0? this->armSelectorInstance.totalRewards[id]/this->armSelectorInstance.totalPulls[id]: INT_MIN;
         }
         int worstArmIndex = std::min_element(averageRewards.begin(),averageRewards.end(),[](std::pair<const int,RewardTemplate>& a, std::pair<const int,RewardTemplate>& b){return a.second < b.second;})->first;
         return this->arms.find(worstArmIndex)->second;
     }
-    void run(){
+    void run() override {
         std::cout<<"\n";
         for(int PHASE = 1; PHASE <= this->ARMS -1; PHASE++){
             int length = ceil(this->C/this->arms.size())-((PHASE>1)?ceil(this->C/(this->arms.size()+1)):0);
@@ -95,13 +95,11 @@ public:
             }
             ArmTemplate worstArm = findWorstArm(this->armSelectorInstance.pastRewards.size()-1,length);
             this->arms.erase(worstArm.id);
-            this->armSelectorInstance.totalPulls.clear();
-            this->armSelectorInstance.totalRewards.clear();
             std::cout<<"Removed Worst Arm: "<<worstArm.id<<"\n";
             std::cout<<"\n";
         }
     }
-    RewardTemplate evaluate(){
+    RewardTemplate evaluate() override {
         if(this->arms.size()>1){
             ArmTemplate bestArm = this->findBestArm();
             std::cout<<"There are multiple Arms left! Empirical best Arm: "<<bestArm.id<<"\n";
@@ -129,7 +127,7 @@ public:
         std::cout<<"UCB_E selected Arm: "<<bestArmIndex<<" | ";
         return this->arms.find(bestArmIndex)->second;
     }
-    void run(){
+    void run() override {
         std::cout<<"\n";
         for(int i = 0; i< this->BUDGET; i++){
             std::cout<<"ROUND: "<<i<<" | ";
@@ -139,10 +137,3 @@ public:
         std::cout<<"\n";
     }
 };
-// has k-1 phases
-// each arm is pulled ceil[(n-K/logK)*1/(remaining arms)] times
-// sum is less than N anyways
-// first phase: p1 = ceil[n-K/KlogK]
-// second phase: p2 = ceil[n-K/logK(K-1)] - p1
-// ...
-// last phase: pK-1 = ceil[n-K/2logK] - p {K-2}
