@@ -27,7 +27,7 @@ public:
     RewardTemplate getReward() override {;
         std::normal_distribution<RewardTemplate> gaussian(this->mean,this->stdDev);
         RewardTemplate reward = gaussian(*(this->generatorptr));
-        std::cout<<"RandomGaussianArm reward: "<<reward<<"\n";
+        // std::cout<<"RandomGaussianArm reward: "<<reward<<"\n";
         return reward;
     }
     RewardTemplate getMean(){
@@ -58,7 +58,7 @@ public:
         std::uniform_real_distribution<RewardTemplate> uniform(0,1);
         RewardTemplate sample = uniform(*(this->generatorptr));
         RewardTemplate reward = sample<=this->p? 1: 0;
-        std::cout<<"BernoulliArm reward: "<<reward<<"\n";
+        // std::cout<<"BernoulliArm reward: "<<reward<<"\n";
         return reward;
     }
     RewardTemplate getMean(){
