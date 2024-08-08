@@ -12,6 +12,7 @@ public:
         this->generatorptr = &generator;
     }
     virtual RewardTemplate getReward() = 0;
+    virtual void printReward(RewardTemplate reward) = 0; 
 };
 
 template <typename RewardTemplate>
@@ -24,6 +25,9 @@ public:
         setStdDev();
         std::cout<<"RandomGaussianArm Mean: "<<this->mean<<" "<<"StdDev: "<<this->stdDev<<"\n";
     };
+    void printReward(RewardTemplate reward) override {
+        std::cout<<"RandomGaussianArm reward: "<<reward<<"\n";
+    }
     RewardTemplate getReward() override {;
         std::normal_distribution<RewardTemplate> gaussian(this->mean,this->stdDev);
         RewardTemplate reward = gaussian(*(this->generatorptr));
@@ -54,6 +58,9 @@ public:
         setMean();
         std::cout<<"BernoulliArm p: "<<this->p<<"\n";
     };
+    void printReward(RewardTemplate reward) override {
+        std::cout<<"BernoulliArm reward: "<<reward<<"\n";
+    }
     RewardTemplate getReward() override {;
         std::uniform_real_distribution<RewardTemplate> uniform(0,1);
         RewardTemplate sample = uniform(*(this->generatorptr));

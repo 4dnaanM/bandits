@@ -39,7 +39,7 @@ public:
             std::cout<<"ROUND: "<<i<<" | ";
             ArmTemplate selectedArm = this->armSelectorInstance.selectArm();
             RewardTemplate reward = this->armSelectorInstance.playArm(selectedArm);
-            std::cout<<"Reward: "<<reward<<"\n";
+            selectedArm.printReward(reward);
         }
         std::cout<<"\n";
     }
@@ -93,7 +93,7 @@ public:
                 for(int i = 0; i< length; i++){
                     std::cout<<"ROUND: "<<i<<" | ";
                     RewardTemplate reward = this->armSelectorInstance.playArm(arm);
-                    std::cout<<"Reward: "<<reward<<"\n";
+                    arm.printReward(reward);
                 }
             }
             ArmTemplate worstArm = findWorstArm();
@@ -136,7 +136,7 @@ public:
             std::cout<<"ROUND: "<<i<<" | ";
             ArmTemplate selectedArm = getNextArm();
             RewardTemplate reward = this->armSelectorInstance.playArm(selectedArm);
-            std::cout<<"Reward: "<<reward<<"\n";
+            selectedArm.printReward(reward);
         }
         std::cout<<"\n";
     }
@@ -238,8 +238,7 @@ public:
             this->arms.erase(id);
         }
         std::cout<<"\n";
-    }
-        
+    }        
     void run() override {
         RewardTemplate e = this->epsilon/4; 
         double d = this->delta/2;
@@ -260,5 +259,118 @@ public:
             std::cout<<"\n";
         }
         std::cout<<"Total Pulls: "<<this->totalPulls<<"\n";
+    }
+    RewardTemplate evaluate() override {
+        if(this->arms.size()>1){
+            ArmTemplate bestArm = this->findBestArm();
+            std::cout<<"There are multiple Arms left! Empirical best Arm: "<<bestArm.id<<"\n";
+            return this->evaluatorInstance.evaluateRegret(bestArm);
+        }
+        ArmTemplate bestArm = this->arms.begin()->second;
+        std::cout<<"Final Remaining Arm: "<<bestArm.id<<"\n";
+        return this->evaluatorInstance.evaluateRegret(bestArm);
+    }
+};
+
+template <typename ArmTemplate, typename RewardTemplate, typename AllocatorTemplate, typename EvaluatorTemplate>
+class ExponentialGapElimination: public fixedConfidence<ArmTemplate,RewardTemplate,AllocatorTemplate,EvaluatorTemplate>{
+    int medianPulls; 
+public: 
+    ExponentialGapElimination(int ARMS, std::mt19937& generator, double delta)
+        :fixedConfidence<ArmTemplate,RewardTemplate,AllocatorTemplate,EvaluatorTemplate>(ARMS,delta,generator) {
+            this->medianPulls = 0;
+        }
+    void sampleArms(int length){
+        for(auto p: this->arms){
+            int id = p.first; 
+            ArmTemplate arm = p.second;
+            for(int i = 0; i< length; i++){
+                RewardTemplate reward = this->armSelectorInstance.playArm(arm);
+            }
+        }
+    }
+    void removeArms(RewardTemplate threshold){
+        std::vector<int> toRemove; 
+        for(auto p: this->arms){
+            int id = p.first;
+            RewardTemplate averageReward = this->armSelectorInstance.totalPulls[id]>0? this->armSelectorInstance.totalRewards[id]/this->armSelectorInstance.totalPulls[id]: INT_MAX;
+            std::cout<<"Arm "<<id<<" has average reward "<<averageReward<<"\n";
+            if(averageReward < threshold){
+                toRemove.push_back(id);
+            }
+        }
+        std::cout<<"Removing Arms: ";
+        for(int id: toRemove){
+            std::cout<<id<<" ";
+            this->arms.erase(id);
+        }
+        std::cout<<"\n";
+    }        
+    int medianElimination(RewardTemplate epsilon, double delta){
+        std::map<int,ArmTemplate> arms = this->arms; 
+        RewardTemplate e = epsilon/4; 
+        double d = delta/2;
+        
+        while(arms.size()>1){
+            int length = ceil(4*log(3/d)/(e*e));
+            this->totalPulls+=length*arms.size();
+            this->medianPulls+=length*arms.size();
+            if(length==0)break;
+            std::map<int,RewardTemplate> armRewards;
+            std::map<int,int> armPulls; 
+            for(auto p: arms){for(int i = 0; i< length; i++){armRewards[p.first]+=p.second.getReward();armPulls[p.first]+=1;}}
+            std::vector<RewardTemplate> averageRewards;
+            for(auto p : arms){
+                int id = p.first;
+                averageRewards.push_back(armPulls[id]>0? armRewards[id]/armPulls[id]: INT_MIN);
+            }
+            std::sort(averageRewards.begin(),averageRewards.end());
+            RewardTemplate median = averageRewards[averageRewards.size()/2];
+            if(averageRewards.size()%2==0){median = (median+averageRewards[averageRewards.size()/2-1])/2;}
+            std::vector<int> toRemove; 
+            for(auto p: arms){
+                int id = p.first;
+                RewardTemplate averageReward = armPulls[id]>0? armRewards[id]/armPulls[id]: INT_MAX;
+                if(averageReward < median){toRemove.push_back(id);}
+            }
+            for(int id: toRemove){arms.erase(id);}
+            e = 3*e/4; 
+            d = d/2;
+        }
+        return arms.begin()->first;
+    }
+    void run() override {
+        int round = 1;
+        while(this->arms.size()>1){
+            RewardTemplate e = pow(2,-1*round)/4; 
+            double d = this->delta/(50*round*round*round);
+            int length = ceil(2*log(2/d)/(e*e));
+            this->totalPulls+=length*this->arms.size();
+            this->armSelectorInstance.totalRewards.clear();
+            this->armSelectorInstance.totalPulls.clear();
+            if(length==0)break; 
+            std::cout<<"Sampling for "<<length<<"*"<<this->arms.size()<<" = "<<length*this->arms.size()<<" rounds each \n";
+            sampleArms(length);
+            int optArm = medianElimination(e/2,d);
+            RewardTemplate optReward = this->armSelectorInstance.totalPulls[optArm]>0? this->armSelectorInstance.totalRewards[optArm]/this->armSelectorInstance.totalPulls[optArm]: INT_MAX;
+            std::cout<<"Optimal Arm: "<<optArm<<" with Average Reward: "<<optReward<<"\n";
+            std::cout<<"Threshold: "<<optReward<<"-"<<e<<" = "<<optReward-e<<"\n";
+            removeArms(optReward-e);
+            round+=1; 
+            std::cout<<"\n";
+        }
+        std::cout<<"Total Pulls: "<<this->totalPulls<<" | ";
+        std::cout<<"MedianElimination Pulls: "<<this->medianPulls<<" | ";
+        std::cout<<"EGElimination Pulls: "<<this->totalPulls-this->medianPulls<<"\n";
+    }
+    RewardTemplate evaluate() override {
+        if(this->arms.size()>1){
+            ArmTemplate bestArm = this->findBestArm();
+            std::cout<<"There are multiple Arms left! Empirical best Arm: "<<bestArm.id<<"\n";
+            return this->evaluatorInstance.evaluateRegret(bestArm);
+        }
+        ArmTemplate bestArm = this->arms.begin()->second;
+        std::cout<<"Final Remaining Arm: "<<bestArm.id<<"\n";
+        return this->evaluatorInstance.evaluateRegret(bestArm);
     }
 };

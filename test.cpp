@@ -21,10 +21,11 @@ int main(){
     // SuccessiveRejectsAlgorithm<BernoulliArm<double>,double,UniformAllocator<BernoulliArm<double>,double>,DeltaEvaluator<BernoulliArm<double>,double>> algorithmInstance(ARMS,BUDGET,generator);
     // UCB_2<BernoulliArm<double>,double,UniformAllocator<BernoulliArm<double>,double>,DeltaEvaluator<BernoulliArm<double>,double>> algorithmInstance(ARMS,BUDGET,generator,a);
     
-    std::cout<<"Testing fixed confidence with "<<ARMS<<" arms and "<<delta<<" delta\n\n";
+    std::cout<<"Testing Exponential Gap Elimination with "<<ARMS<<" arms and "<<delta<<" delta\n";
     
-    MedianElimination<BernoulliArm<double>,double,UniformAllocator<BernoulliArm<double>, double>, DeltaEvaluator<BernoulliArm<double>,double>> algorithmInstance(ARMS,generator,epsilon,delta);
+    // MedianElimination<BernoulliArm<double>,double,UniformAllocator<BernoulliArm<double>, double>, DeltaEvaluator<BernoulliArm<double>,double>> algorithmInstance(ARMS,generator,epsilon,delta);
     // MedianElimination<RandomGaussianArm<double>,double,UniformAllocator<RandomGaussianArm<double>, double>, DeltaEvaluator<RandomGaussianArm<double>,double>> algorithmInstance(ARMS,generator,epsilon,delta);
+    ExponentialGapElimination<BernoulliArm<double>,double,UniformAllocator<BernoulliArm<double>, double>, DeltaEvaluator<BernoulliArm<double>,double>> algorithmInstance(ARMS,generator,delta);
     algorithmInstance.run();
     algorithmInstance.evaluate();
 
