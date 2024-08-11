@@ -2,7 +2,7 @@
 #include <map> 
 #include <vector>
 
-template <typename ArmTemplate,typename RewardTemplate>
+template <typename ArmTemplate = BernoulliArm<>,typename RewardTemplate = double>
 class Evaluator{
 protected: 
     std::map<int,ArmTemplate>* armsptr;
@@ -13,7 +13,7 @@ public:
     virtual RewardTemplate evaluateRegret(ArmTemplate& selectedArm) = 0;
 };
 
-template <typename ArmTemplate, typename RewardTemplate>
+template <typename ArmTemplate = BernoulliArm<>,typename RewardTemplate = double>
 class DeltaEvaluator : public Evaluator<ArmTemplate,RewardTemplate>{
     ArmTemplate optimalArm; 
 public:

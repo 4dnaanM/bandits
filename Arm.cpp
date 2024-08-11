@@ -1,7 +1,7 @@
 #include <random>
 #include <iostream> 
 
-template <typename RewardTemplate>
+template <typename RewardTemplate = double>
 class Arm{
 protected: 
     std::mt19937* generatorptr;
@@ -15,7 +15,7 @@ public:
     virtual void printReward(RewardTemplate reward) = 0; 
 };
 
-template <typename RewardTemplate>
+template <typename RewardTemplate = double>
 class RandomGaussianArm: public Arm<RewardTemplate>{
     RewardTemplate mean; 
     RewardTemplate stdDev;
@@ -50,7 +50,7 @@ public:
     }
 };
 
-template <typename RewardTemplate>
+template <typename RewardTemplate = double>
 class BernoulliArm: public Arm<RewardTemplate>{
     RewardTemplate p; 
 public:

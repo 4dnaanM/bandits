@@ -3,7 +3,7 @@
 #include <random>
 #include <map> 
 
-template <typename ArmTemplate, typename RewardTemplate>
+template <typename ArmTemplate = BernoulliArm<>, typename RewardTemplate = double>
 class ArmSelector{
 protected: 
     std::map<int,ArmTemplate>* armsptr;
@@ -37,7 +37,7 @@ public:
     }
 };
 
-template <typename ArmTemplate, typename RewardTemplate>
+template <typename ArmTemplate = BernoulliArm<>, typename RewardTemplate = double>
 class RandomArmSelector : public ArmSelector<ArmTemplate, RewardTemplate>{
 private: 
     std::mt19937* generatorptr;
@@ -54,7 +54,7 @@ public:
     }
 };
 
-template <typename ArmTemplate, typename RewardTemplate> 
+template <typename ArmTemplate = BernoulliArm<>, typename RewardTemplate = double>
 class UniformAllocator : public ArmSelector<ArmTemplate, RewardTemplate>{
 public: 
     UniformAllocator(std::map<int,ArmTemplate>& arms, std::mt19937& generator):ArmSelector<ArmTemplate, RewardTemplate>(arms){};

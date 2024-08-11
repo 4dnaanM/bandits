@@ -3,8 +3,16 @@
 #include <random>
 #include <map> 
 
-template <typename ArmTemplate, typename RewardTemplate, typename AllocatorTemplate, typename EvaluatorTemplate>
-class fixedBudget{
+template <typename RewardTemplate = double>
+class BanditAlgorithm{
+public:
+    virtual void run() = 0;
+    virtual RewardTemplate evaluate() = 0;
+    virtual ~BanditAlgorithm() = default;
+};
+
+template <typename ArmTemplate = BernoulliArm<>, typename RewardTemplate = double, typename AllocatorTemplate = UniformAllocator<>, typename EvaluatorTemplate = DeltaEvaluator<>>
+class fixedBudget: public BanditAlgorithm<RewardTemplate>{
 protected:
     int ARMS; 
     int BUDGET; 
@@ -33,7 +41,7 @@ public:
         return localArms;
     }
     
-    virtual void run(){
+    virtual void run() override {
         std::cout<<"\n";
         for(int i = 0; i< this->BUDGET; i++){
             std::cout<<"ROUND: "<<i<<" | ";
@@ -53,14 +61,14 @@ public:
         return this->arms.find(bestArmIndex)->second;
     }
 
-    virtual RewardTemplate evaluate(){
+    virtual RewardTemplate evaluate() override {
         ArmTemplate bestArm = findBestArm();
         std::cout<<"Empirical Best Arm: "<<bestArm.id<<"\n";
         return this->evaluatorInstance.evaluateRegret(bestArm);
     }
 };
 
-template <typename ArmTemplate, typename RewardTemplate, typename AllocatorTemplate, typename EvaluatorTemplate>
+template <typename ArmTemplate = BernoulliArm<>, typename RewardTemplate = double, typename AllocatorTemplate = UniformAllocator<>, typename EvaluatorTemplate = DeltaEvaluator<>>
 class SuccessiveRejectsAlgorithm: public fixedBudget<ArmTemplate,RewardTemplate,AllocatorTemplate,EvaluatorTemplate>{
     double C;
 public: 
@@ -114,7 +122,7 @@ public:
     }
 };
 
-template <typename ArmTemplate, typename RewardTemplate, typename AllocatorTemplate, typename EvaluatorTemplate>
+template <typename ArmTemplate = BernoulliArm<>, typename RewardTemplate = double, typename AllocatorTemplate = UniformAllocator<>, typename EvaluatorTemplate = DeltaEvaluator<>>
 class UCB_2: public fixedBudget<ArmTemplate,RewardTemplate,AllocatorTemplate,EvaluatorTemplate>{
     double a;
 public: 
@@ -142,8 +150,8 @@ public:
     }
 };
 
-template <typename ArmTemplate, typename RewardTemplate, typename AllocatorTemplate, typename EvaluatorTemplate>
-class fixedConfidence{
+template <typename ArmTemplate = BernoulliArm<>, typename RewardTemplate = double, typename AllocatorTemplate = UniformAllocator<>, typename EvaluatorTemplate = DeltaEvaluator<>>
+class fixedConfidence: public BanditAlgorithm<RewardTemplate>{
 protected:
     int ARMS; 
     double delta;
@@ -173,7 +181,7 @@ public:
         return localArms;
     }
     
-    virtual void run() = 0;
+    virtual void run() override = 0;
 
     virtual ArmTemplate findBestArm(){
         std::map<int,RewardTemplate> averageRewards;
@@ -184,14 +192,14 @@ public:
         return this->arms.find(bestArmIndex)->second;
     }
 
-    virtual RewardTemplate evaluate(){
+    virtual RewardTemplate evaluate() override {
         ArmTemplate bestArm = findBestArm();
         std::cout<<"Empirical Best Arm: "<<bestArm.id<<"\n";
         return this->evaluatorInstance.evaluateRegret(bestArm);
     }
 };
 
-template <typename ArmTemplate, typename RewardTemplate, typename AllocatorTemplate, typename EvaluatorTemplate>
+template <typename ArmTemplate = BernoulliArm<>, typename RewardTemplate = double, typename AllocatorTemplate = UniformAllocator<>, typename EvaluatorTemplate = DeltaEvaluator<>>
 class MedianElimination: public fixedConfidence<ArmTemplate,RewardTemplate,AllocatorTemplate,EvaluatorTemplate>{
     RewardTemplate epsilon; 
 public: 
@@ -200,12 +208,8 @@ public:
     }
     void sampleArms(int length){
         for(auto p: this->arms){
-            int id = p.first; 
-            ArmTemplate arm = p.second;
-            // std::cout<<"Playing Arm "<<id<<std::endl;
             for(int i = 0; i< length; i++){
-                // std::cout<<"ROUND: "<<i<<" | ";
-                RewardTemplate reward = this->armSelectorInstance.playArm(arm);
+                RewardTemplate reward = this->armSelectorInstance.playArm(p.second);
             }
         }
     }
@@ -272,7 +276,7 @@ public:
     }
 };
 
-template <typename ArmTemplate, typename RewardTemplate, typename AllocatorTemplate, typename EvaluatorTemplate>
+template <typename ArmTemplate = BernoulliArm<>, typename RewardTemplate = double, typename AllocatorTemplate = UniformAllocator<>, typename EvaluatorTemplate = DeltaEvaluator<>>
 class ExponentialGapElimination: public fixedConfidence<ArmTemplate,RewardTemplate,AllocatorTemplate,EvaluatorTemplate>{
     int medianPulls; 
 public: 
