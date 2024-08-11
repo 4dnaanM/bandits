@@ -2,16 +2,21 @@
 #include <vector>
 #include <random>
 #include <map> 
+#include "Arm.cpp"
+#include "armSelectorClass.cpp"
+#include "evaluatorClass.cpp"
+#include "metrics.cpp"
 
 template <typename RewardTemplate = double>
 class BanditAlgorithm{
 public:
     virtual void run() = 0;
-    virtual RewardTemplate evaluate() = 0;
+    virtual void refresh() = 0;
+    virtual Metrics<RewardTemplate> evaluate() = 0;
     virtual ~BanditAlgorithm() = default;
 };
 
-template <typename ArmTemplate = BernoulliArm<>, typename RewardTemplate = double, typename AllocatorTemplate = UniformAllocator<>, typename EvaluatorTemplate = DeltaEvaluator<>>
+template <typename RewardTemplate = double, typename ArmTemplate = BernoulliArm<RewardTemplate>, typename AllocatorTemplate = UniformAllocator<RewardTemplate,ArmTemplate>, typename EvaluatorTemplate = DeltaEvaluator<RewardTemplate,ArmTemplate>>
 class fixedBudget: public BanditAlgorithm<RewardTemplate>{
 protected:
     int ARMS; 
@@ -20,36 +25,48 @@ protected:
     std::mt19937* generatorptr;
     AllocatorTemplate armSelectorInstance;
     EvaluatorTemplate evaluatorInstance;
+    int totalPulls; 
+    bool silent;
 public:
 
-    fixedBudget(int ARMS, int BUDGET, std::mt19937& generator):
+    fixedBudget(int ARMS, int BUDGET, std::mt19937& generator, bool silent = false):
         ARMS(ARMS),
         BUDGET(BUDGET),
         generatorptr(&generator),
-        arms(createArms(ARMS, &generator)),
-        armSelectorInstance(arms,generator),
-        evaluatorInstance(arms)
-    {}
+        arms(createArms(ARMS, &generator,silent)),
+        armSelectorInstance(arms,generator,silent),
+        evaluatorInstance(arms),
+        silent(silent){
+            this->totalPulls = 0;
+        }
     
-    virtual std::map<int,ArmTemplate> createArms(int ARMS, std::mt19937* generatorptr){
+    void refresh() override {
+        this->arms = createArms(this->ARMS,this->generatorptr,this->silent);
+        this->armSelectorInstance = AllocatorTemplate(this->arms,*(this->generatorptr),this->silent);
+        this->evaluatorInstance = EvaluatorTemplate(this->arms);
+        this->totalPulls = 0; 
+    }
+
+    virtual std::map<int,ArmTemplate> createArms(int ARMS, std::mt19937* generatorptr,bool silent = false){
         std::map<int,ArmTemplate> localArms;
         for(int i = 0; i<ARMS; i++){
-            std::cout<<i<<" | ";
-            localArms.emplace(i,ArmTemplate(*(generatorptr),i));
+            if(!silent){std::cout<<i<<" | ";}
+            localArms.emplace(i,ArmTemplate(*(generatorptr),i,silent));
         }
-        std::cout<<"\n";
+        if(!silent){std::cout<<"\n";}
         return localArms;
     }
     
     virtual void run() override {
-        std::cout<<"\n";
+        if(!this->silent)std::cout<<"\n";
         for(int i = 0; i< this->BUDGET; i++){
-            std::cout<<"ROUND: "<<i<<" | ";
+            if(!this->silent)std::cout<<"ROUND: "<<i<<" | ";
+            this->totalPulls+=1; 
             ArmTemplate selectedArm = this->armSelectorInstance.selectArm();
             RewardTemplate reward = this->armSelectorInstance.playArm(selectedArm);
-            selectedArm.printReward(reward);
+            if(!this->silent)selectedArm.printReward(reward);
         }
-        std::cout<<"\n";
+        if(!this->silent)std::cout<<"\n";
     }
 
     virtual ArmTemplate findBestArm(){
@@ -61,19 +78,24 @@ public:
         return this->arms.find(bestArmIndex)->second;
     }
 
-    virtual RewardTemplate evaluate() override {
+    virtual Metrics<RewardTemplate> evaluate() override {
         ArmTemplate bestArm = findBestArm();
-        std::cout<<"Empirical Best Arm: "<<bestArm.id<<"\n";
-        return this->evaluatorInstance.evaluateRegret(bestArm);
+        if(!this->silent)std::cout<<"Empirical Best Arm: "<<bestArm.id<<"\n";
+        return Metrics<RewardTemplate>(
+            this->evaluatorInstance.optimalArm.getMean(),
+            this->evaluatorInstance.evaluateRegret(bestArm),
+            this->evaluatorInstance.H1,
+            this->totalPulls
+        );
     }
 };
 
-template <typename ArmTemplate = BernoulliArm<>, typename RewardTemplate = double, typename AllocatorTemplate = UniformAllocator<>, typename EvaluatorTemplate = DeltaEvaluator<>>
-class SuccessiveRejectsAlgorithm: public fixedBudget<ArmTemplate,RewardTemplate,AllocatorTemplate,EvaluatorTemplate>{
+template <typename RewardTemplate = double, typename ArmTemplate = BernoulliArm<RewardTemplate>, typename AllocatorTemplate = UniformAllocator<RewardTemplate,ArmTemplate>, typename EvaluatorTemplate = DeltaEvaluator<RewardTemplate,ArmTemplate>>
+class SuccessiveRejectsAlgorithm: public fixedBudget<RewardTemplate,ArmTemplate,AllocatorTemplate,EvaluatorTemplate>{
     double C;
 public: 
-    SuccessiveRejectsAlgorithm(int ARMS, int BUDGET, std::mt19937& generator): fixedBudget<ArmTemplate,RewardTemplate,AllocatorTemplate,EvaluatorTemplate>(ARMS,BUDGET,generator) {
-        double logK = 0.5; 
+    SuccessiveRejectsAlgorithm(int ARMS, int BUDGET, std::mt19937& generator, bool silent=false): fixedBudget<RewardTemplate,ArmTemplate,AllocatorTemplate,EvaluatorTemplate>(ARMS,BUDGET,generator,silent) {
+        double logK = 0.5;  
         for(double i = 2; i<=this->ARMS; i+=1){
             logK+=1/i;
         }
@@ -89,44 +111,58 @@ public:
         return this->arms.find(worstArmIndex)->second;
     }
     void run() override {
-        std::cout<<"\n";
+        if(!this->silent)std::cout<<"\n";
         for(int PHASE = 1; PHASE <= this->ARMS -1; PHASE++){
             int length = ceil(this->C/this->arms.size())-((PHASE>1)?ceil(this->C/(this->arms.size()+1)):0);
-            std::cout<<"Phase "<<PHASE<<" with length "<<length<<"*"<<this->arms.size()<<" = "<<length*this->arms.size()<<"\n";
-            if(length==0) continue; 
+            this->totalPulls+=length*this->arms.size();
+            if(!this->silent)std::cout<<"Phase "<<PHASE<<" with length "<<length<<"*"<<this->arms.size()<<" = "<<length*this->arms.size()<<"\n";
+            if(length==0){
+                std::cout<<"Not Enough Budget to continue!\n";    
+                continue;
+            }
             for(auto p: this->arms){
                 int id = p.first; 
                 ArmTemplate arm = p.second;
-                std::cout<<"Playing Arm "<<id<<std::endl;
+                if(!this->silent)std::cout<<"Playing Arm "<<id<<std::endl;
                 for(int i = 0; i< length; i++){
-                    std::cout<<"ROUND: "<<i<<" | ";
+                    if(!this->silent)std::cout<<"ROUND: "<<i<<" | ";
                     RewardTemplate reward = this->armSelectorInstance.playArm(arm);
-                    arm.printReward(reward);
+                    if(!this->silent)arm.printReward(reward);
                 }
             }
             ArmTemplate worstArm = findWorstArm();
             this->arms.erase(worstArm.id);
-            std::cout<<"Removed Worst Arm: "<<worstArm.id<<"\n";
-            std::cout<<"\n";
+            if(!this->silent)std::cout<<"Removed Worst Arm: "<<worstArm.id<<"\n";
+            if(!this->silent)std::cout<<"\n";
         }
     }
-    RewardTemplate evaluate() override {
+    Metrics<RewardTemplate> evaluate() override {
         if(this->arms.size()>1){
             ArmTemplate bestArm = this->findBestArm();
-            std::cout<<"There are multiple Arms left! Empirical best Arm: "<<bestArm.id<<"\n";
-            return this->evaluatorInstance.evaluateRegret(bestArm);
+            if(!this->silent)std::cout<<"There are multiple Arms left! Empirical best Arm: "<<bestArm.id<<"\n";
+            return Metrics<RewardTemplate>(
+                this->evaluatorInstance.optimalArm.getMean(),
+                this->evaluatorInstance.evaluateRegret(bestArm),
+                this->evaluatorInstance.H1,
+                this->totalPulls
+            );
         }
         ArmTemplate bestArm = this->arms.begin()->second;
-        std::cout<<"Final Remaining Arm: "<<bestArm.id<<"\n";
-        return this->evaluatorInstance.evaluateRegret(bestArm);
+        if(!this->silent)std::cout<<"Final Remaining Arm: "<<bestArm.id<<"\n";
+        return Metrics<RewardTemplate>(
+            this->evaluatorInstance.optimalArm.getMean(),
+            this->evaluatorInstance.evaluateRegret(bestArm),
+            this->evaluatorInstance.H1, 
+            this->totalPulls
+        );
     }
 };
 
-template <typename ArmTemplate = BernoulliArm<>, typename RewardTemplate = double, typename AllocatorTemplate = UniformAllocator<>, typename EvaluatorTemplate = DeltaEvaluator<>>
-class UCB_2: public fixedBudget<ArmTemplate,RewardTemplate,AllocatorTemplate,EvaluatorTemplate>{
+template <typename RewardTemplate = double, typename ArmTemplate = BernoulliArm<RewardTemplate>, typename AllocatorTemplate = UniformAllocator<RewardTemplate,ArmTemplate>, typename EvaluatorTemplate = DeltaEvaluator<RewardTemplate,ArmTemplate>>
+class UCB_2: public fixedBudget<RewardTemplate,ArmTemplate,AllocatorTemplate,EvaluatorTemplate>{
     double a;
 public: 
-    UCB_2(int ARMS, int BUDGET, std::mt19937& generator, double a): fixedBudget<ArmTemplate,RewardTemplate,AllocatorTemplate,EvaluatorTemplate>(ARMS,BUDGET,generator) {
+    UCB_2(int ARMS, int BUDGET, std::mt19937& generator, double a, bool silent = false): fixedBudget<RewardTemplate,ArmTemplate,AllocatorTemplate,EvaluatorTemplate>(ARMS,BUDGET,generator,silent) {
         this->a = a;
     }
     ArmTemplate getNextArm(){
@@ -135,22 +171,22 @@ public:
             comparator[i] = this->armSelectorInstance.totalPulls[i]>0? (this->armSelectorInstance.totalRewards[i]/this->armSelectorInstance.totalPulls[i]+sqrt(a/this->armSelectorInstance.totalPulls[i])): INT_MAX;
         }
         int bestArmIndex = std::max_element(comparator.begin(),comparator.end(),[](std::pair<const int,RewardTemplate>& a, std::pair<const int,RewardTemplate>& b){return a.second < b.second;})->first;
-        std::cout<<"Selected Arm: "<<bestArmIndex<<" | ";
+        if(!this->silent)std::cout<<"Selected Arm: "<<bestArmIndex<<" | ";
         return this->arms.find(bestArmIndex)->second;
     }
     void run() override {
-        std::cout<<"\n";
+        if(!this->silent)std::cout<<"\n";
         for(int i = 0; i< this->BUDGET; i++){
-            std::cout<<"ROUND: "<<i<<" | ";
+            if(!this->silent)std::cout<<"ROUND: "<<i<<" | ";
             ArmTemplate selectedArm = getNextArm();
             RewardTemplate reward = this->armSelectorInstance.playArm(selectedArm);
-            selectedArm.printReward(reward);
+            if(!this->silent)selectedArm.printReward(reward);
         }
-        std::cout<<"\n";
+        if(!this->silent)std::cout<<"\n";
     }
 };
 
-template <typename ArmTemplate = BernoulliArm<>, typename RewardTemplate = double, typename AllocatorTemplate = UniformAllocator<>, typename EvaluatorTemplate = DeltaEvaluator<>>
+template <typename RewardTemplate = double, typename ArmTemplate = BernoulliArm<RewardTemplate>, typename AllocatorTemplate = UniformAllocator<RewardTemplate,ArmTemplate>, typename EvaluatorTemplate = DeltaEvaluator<RewardTemplate,ArmTemplate>>
 class fixedConfidence: public BanditAlgorithm<RewardTemplate>{
 protected:
     int ARMS; 
@@ -160,24 +196,33 @@ protected:
     AllocatorTemplate armSelectorInstance;
     EvaluatorTemplate evaluatorInstance;
     int totalPulls; 
+    bool silent; 
 public:
 
-    fixedConfidence(int ARMS, double delta, std::mt19937& generator):
+    fixedConfidence(int ARMS, double delta, std::mt19937& generator,bool silent = false):
         ARMS(ARMS),
         delta(delta),
         generatorptr(&generator),
-        arms(createArms(ARMS, &generator)),
-        armSelectorInstance(arms,generator),
-        evaluatorInstance(arms)
+        arms(createArms(ARMS, &generator,silent)),
+        armSelectorInstance(arms,generator,silent),
+        evaluatorInstance(arms),
+        silent(silent)
     {}
+
+    void refresh() override {
+        this->arms = createArms(this->ARMS,this->generatorptr,this->silent);
+        this->armSelectorInstance = AllocatorTemplate(this->arms,*(this->generatorptr));
+        this->evaluatorInstance = EvaluatorTemplate(this->arms);
+        this->totalPulls = 0;
+    }
     
-    virtual std::map<int,ArmTemplate> createArms(int ARMS, std::mt19937* generatorptr){
+    virtual std::map<int,ArmTemplate> createArms(int ARMS, std::mt19937* generatorptr,bool silent = false){
         std::map<int,ArmTemplate> localArms;
         for(int i = 0; i<ARMS; i++){
-            std::cout<<i<<" | ";
-            localArms.emplace(i,ArmTemplate(*(generatorptr),i));
+            if(!silent){std::cout<<i<<" | ";}
+            localArms.emplace(i,ArmTemplate(*(generatorptr),i,silent));
         }
-        std::cout<<"\n";
+        if(!silent){std::cout<<"\n";}
         return localArms;
     }
     
@@ -192,18 +237,23 @@ public:
         return this->arms.find(bestArmIndex)->second;
     }
 
-    virtual RewardTemplate evaluate() override {
+    virtual Metrics<RewardTemplate> evaluate() override {
         ArmTemplate bestArm = findBestArm();
-        std::cout<<"Empirical Best Arm: "<<bestArm.id<<"\n";
-        return this->evaluatorInstance.evaluateRegret(bestArm);
+        if(!this->silent)std::cout<<"Empirical Best Arm: "<<bestArm.id<<"\n";
+        return Metrics<RewardTemplate>(
+            this->evaluatorInstance.optimalArm.getMean(),
+            this->evaluatorInstance.evaluateRegret(bestArm),
+            this->evaluatorInstance.H1,
+            this->totalPulls
+        );
     }
 };
 
-template <typename ArmTemplate = BernoulliArm<>, typename RewardTemplate = double, typename AllocatorTemplate = UniformAllocator<>, typename EvaluatorTemplate = DeltaEvaluator<>>
-class MedianElimination: public fixedConfidence<ArmTemplate,RewardTemplate,AllocatorTemplate,EvaluatorTemplate>{
+template <typename RewardTemplate = double, typename ArmTemplate = BernoulliArm<RewardTemplate>, typename AllocatorTemplate = UniformAllocator<RewardTemplate,ArmTemplate>, typename EvaluatorTemplate = DeltaEvaluator<RewardTemplate,ArmTemplate>>
+class MedianElimination: public fixedConfidence<RewardTemplate,ArmTemplate,AllocatorTemplate,EvaluatorTemplate>{
     RewardTemplate epsilon; 
 public: 
-    MedianElimination(int ARMS, std::mt19937& generator, RewardTemplate epsilon, double delta): fixedConfidence<ArmTemplate,RewardTemplate,AllocatorTemplate,EvaluatorTemplate>(ARMS,delta,generator) {
+    MedianElimination(int ARMS, std::mt19937& generator, RewardTemplate epsilon, double delta, bool silent = false): fixedConfidence<RewardTemplate,ArmTemplate,AllocatorTemplate,EvaluatorTemplate>(ARMS,delta,generator,silent) {
         this->epsilon = epsilon;
     }
     void sampleArms(int length){
@@ -231,17 +281,17 @@ public:
         for(auto p: this->arms){
             int id = p.first;
             RewardTemplate averageReward = this->armSelectorInstance.totalPulls[id]>0? this->armSelectorInstance.totalRewards[id]/this->armSelectorInstance.totalPulls[id]: INT_MAX;
-            std::cout<<"Arm "<<id<<" has average reward "<<averageReward<<"\n";
+            if(!this->silent)std::cout<<"Arm "<<id<<" has average reward "<<averageReward<<"\n";
             if(averageReward < median){
                 toRemove.push_back(id);
             }
         }
-        std::cout<<"Removing Arms: ";
+        if(!this->silent)std::cout<<"Removing Arms: ";
         for(int id: toRemove){
-            std::cout<<id<<" ";
+            if(!this->silent)std::cout<<id<<" ";
             this->arms.erase(id);
         }
-        std::cout<<"\n";
+        if(!this->silent)std::cout<<"\n";
     }        
     void run() override {
         RewardTemplate e = this->epsilon/4; 
@@ -249,7 +299,7 @@ public:
         
         while(this->arms.size()>1){
             int length = ceil(4*log(3/d)/(e*e));
-            std::cout<<"Phase with length "<<length<<"*"<<this->arms.size()<<" = "<<length*this->arms.size()<<"\n";
+            if(!this->silent)std::cout<<"Phase with length "<<length<<"*"<<this->arms.size()<<" = "<<length*this->arms.size()<<"\n";
             this->totalPulls+=length*this->arms.size();
             
             this->armSelectorInstance.totalRewards.clear();
@@ -260,28 +310,33 @@ public:
             removeArms(median);
             e = 3*e/4; 
             d = d/2;
-            std::cout<<"\n";
+            if(!this->silent)std::cout<<"\n";
         }
         std::cout<<"Total Pulls: "<<this->totalPulls<<"\n";
     }
-    RewardTemplate evaluate() override {
+    Metrics<RewardTemplate> evaluate() override {
+        ArmTemplate bestArm = this->findBestArm();
         if(this->arms.size()>1){
-            ArmTemplate bestArm = this->findBestArm();
-            std::cout<<"There are multiple Arms left! Empirical best Arm: "<<bestArm.id<<"\n";
-            return this->evaluatorInstance.evaluateRegret(bestArm);
+            if(!this->silent)std::cout<<"There are multiple Arms left! Empirical best Arm: "<<bestArm.id<<"\n";
         }
-        ArmTemplate bestArm = this->arms.begin()->second;
-        std::cout<<"Final Remaining Arm: "<<bestArm.id<<"\n";
-        return this->evaluatorInstance.evaluateRegret(bestArm);
+        else{
+            if(!this->silent)std::cout<<"Final Remaining Arm: "<<bestArm.id<<"\n";
+        }
+        return Metrics<RewardTemplate>(
+            this->evaluatorInstance.optimalArm.getMean(),
+            this->evaluatorInstance.evaluateRegret(bestArm),
+            this->evaluatorInstance.H1, 
+            this->totalPulls
+        );
     }
 };
 
-template <typename ArmTemplate = BernoulliArm<>, typename RewardTemplate = double, typename AllocatorTemplate = UniformAllocator<>, typename EvaluatorTemplate = DeltaEvaluator<>>
-class ExponentialGapElimination: public fixedConfidence<ArmTemplate,RewardTemplate,AllocatorTemplate,EvaluatorTemplate>{
+template <typename RewardTemplate = double, typename ArmTemplate = BernoulliArm<RewardTemplate>, typename AllocatorTemplate = UniformAllocator<RewardTemplate,ArmTemplate>, typename EvaluatorTemplate = DeltaEvaluator<RewardTemplate,ArmTemplate>>
+class ExponentialGapElimination: public fixedConfidence<RewardTemplate,ArmTemplate,AllocatorTemplate,EvaluatorTemplate>{
     int medianPulls; 
 public: 
-    ExponentialGapElimination(int ARMS, std::mt19937& generator, double delta)
-        :fixedConfidence<ArmTemplate,RewardTemplate,AllocatorTemplate,EvaluatorTemplate>(ARMS,delta,generator) {
+    ExponentialGapElimination(int ARMS, std::mt19937& generator, double delta, bool silent = false)
+        :fixedConfidence<RewardTemplate,ArmTemplate,AllocatorTemplate,EvaluatorTemplate>(ARMS,delta,generator,silent) {
             this->medianPulls = 0;
         }
     void sampleArms(int length){
@@ -298,17 +353,17 @@ public:
         for(auto p: this->arms){
             int id = p.first;
             RewardTemplate averageReward = this->armSelectorInstance.totalPulls[id]>0? this->armSelectorInstance.totalRewards[id]/this->armSelectorInstance.totalPulls[id]: INT_MAX;
-            std::cout<<"Arm "<<id<<" has average reward "<<averageReward<<"\n";
+            if(!this->silent)std::cout<<"Arm "<<id<<" has average reward "<<averageReward<<"\n";
             if(averageReward < threshold){
                 toRemove.push_back(id);
             }
         }
-        std::cout<<"Removing Arms: ";
+        if(!this->silent)std::cout<<"Removing Arms: ";
         for(int id: toRemove){
-            std::cout<<id<<" ";
+            if(!this->silent)std::cout<<id<<" ";
             this->arms.erase(id);
         }
-        std::cout<<"\n";
+        if(!this->silent)std::cout<<"\n";
     }        
     int medianElimination(RewardTemplate epsilon, double delta){
         std::map<int,ArmTemplate> arms = this->arms; 
@@ -353,28 +408,36 @@ public:
             this->armSelectorInstance.totalRewards.clear();
             this->armSelectorInstance.totalPulls.clear();
             if(length==0)break; 
-            std::cout<<"Sampling for "<<length<<"*"<<this->arms.size()<<" = "<<length*this->arms.size()<<" rounds each \n";
+            if(!this->silent)std::cout<<"Sampling for "<<length<<"*"<<this->arms.size()<<" = "<<length*this->arms.size()<<" rounds each \n";
             sampleArms(length);
             int optArm = medianElimination(e/2,d);
             RewardTemplate optReward = this->armSelectorInstance.totalPulls[optArm]>0? this->armSelectorInstance.totalRewards[optArm]/this->armSelectorInstance.totalPulls[optArm]: INT_MAX;
-            std::cout<<"Optimal Arm: "<<optArm<<" with Average Reward: "<<optReward<<"\n";
-            std::cout<<"Threshold: "<<optReward<<"-"<<e<<" = "<<optReward-e<<"\n";
+            if(!this->silent)std::cout<<"Optimal Arm: "<<optArm<<" with Average Reward: "<<optReward<<"\n";
+            if(!this->silent)std::cout<<"Threshold: "<<optReward<<"-"<<e<<" = "<<optReward-e<<"\n";
             removeArms(optReward-e);
             round+=1; 
-            std::cout<<"\n";
+            if(!this->silent)std::cout<<"\n";
         }
         std::cout<<"Total Pulls: "<<this->totalPulls<<" | ";
         std::cout<<"MedianElimination Pulls: "<<this->medianPulls<<" | ";
-        std::cout<<"EGElimination Pulls: "<<this->totalPulls-this->medianPulls<<"\n";
+        std::cout<<"EGElimination Pulls: "<<this->totalPulls-this->medianPulls<<"\n"; 
     }
-    RewardTemplate evaluate() override {
+    Metrics<RewardTemplate> evaluate() override {
+        ArmTemplate bestArm = this->findBestArm();
         if(this->arms.size()>1){
-            ArmTemplate bestArm = this->findBestArm();
-            std::cout<<"There are multiple Arms left! Empirical best Arm: "<<bestArm.id<<"\n";
-            return this->evaluatorInstance.evaluateRegret(bestArm);
+            if(!this->silent)std::cout<<"There are multiple Arms left! Empirical best Arm: "<<bestArm.id<<"\n";
         }
-        ArmTemplate bestArm = this->arms.begin()->second;
-        std::cout<<"Final Remaining Arm: "<<bestArm.id<<"\n";
-        return this->evaluatorInstance.evaluateRegret(bestArm);
+        else{
+            if(!this->silent)std::cout<<"Final Remaining Arm: "<<bestArm.id<<"\n";
+        }
+        Metrics<RewardTemplate> metrics(
+            this->evaluatorInstance.optimalArm.getMean(),
+            this->evaluatorInstance.evaluateRegret(bestArm),
+            this->evaluatorInstance.H1,
+            this->totalPulls
+        );
+        this->totalPulls = 0; 
+        this->medianPulls = 0;
+        return metrics;
     }
 };

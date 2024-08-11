@@ -19,11 +19,12 @@ template <typename RewardTemplate = double>
 class RandomGaussianArm: public Arm<RewardTemplate>{
     RewardTemplate mean; 
     RewardTemplate stdDev;
+    bool silent; 
 public:
-    RandomGaussianArm(std::mt19937& generator, int id):Arm<RewardTemplate>(generator,id){
+    RandomGaussianArm(std::mt19937& generator, int id, bool silent = false):Arm<RewardTemplate>(generator,id){
         setMean();
         setStdDev();
-        std::cout<<"RandomGaussianArm Mean: "<<this->mean<<" "<<"StdDev: "<<this->stdDev<<"\n";
+        if(!this->silent)std::cout<<"RandomGaussianArm Mean: "<<this->mean<<" "<<"StdDev: "<<this->stdDev<<"\n";
     };
     void printReward(RewardTemplate reward) override {
         std::cout<<"RandomGaussianArm reward: "<<reward<<"\n";
@@ -31,7 +32,6 @@ public:
     RewardTemplate getReward() override {;
         std::normal_distribution<RewardTemplate> gaussian(this->mean,this->stdDev);
         RewardTemplate reward = gaussian(*(this->generatorptr));
-        // std::cout<<"RandomGaussianArm reward: "<<reward<<"\n";
         return reward;
     }
     RewardTemplate getMean(){
@@ -53,10 +53,11 @@ public:
 template <typename RewardTemplate = double>
 class BernoulliArm: public Arm<RewardTemplate>{
     RewardTemplate p; 
+    bool silent;
 public:
-    BernoulliArm(std::mt19937& generator, int id):Arm<RewardTemplate>(generator,id){
+    BernoulliArm(std::mt19937& generator, int id, bool silent = false):Arm<RewardTemplate>(generator,id){
         setMean();
-        std::cout<<"BernoulliArm p: "<<this->p<<"\n";
+        if(!silent)std::cout<<"BernoulliArm p: "<<this->p<<"\n";
     };
     void printReward(RewardTemplate reward) override {
         std::cout<<"BernoulliArm reward: "<<reward<<"\n";
@@ -65,7 +66,6 @@ public:
         std::uniform_real_distribution<RewardTemplate> uniform(0,1);
         RewardTemplate sample = uniform(*(this->generatorptr));
         RewardTemplate reward = sample<=this->p? 1: 0;
-        // std::cout<<"BernoulliArm reward: "<<reward<<"\n";
         return reward;
     }
     RewardTemplate getMean(){
