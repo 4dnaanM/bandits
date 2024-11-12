@@ -6,26 +6,20 @@
     // check accuracy 
     // check time
     // make csv files for graphs
-    // have modes defined by strings
-    // implement silent mode
-
 template <typename RewardTemplate = double>
 class Wrapper{
 private:
     std::unique_ptr<BanditAlgorithm<RewardTemplate>> algorithmInstance;
     std::mt19937 generator;
-    std::vector<Metrics<RewardTemplate>> metricsList; 
 public: 
     Wrapper(){
         unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
         std::mt19937 generator(seed);
         this->generator = generator;
-        metricsList = std::vector<Metrics<RewardTemplate>>();
         std::cout<<"\n";
         this->algorithmInstance = constructAlgorithm(); 
         int ROUNDS = 1000;
         for(int i = 0; i<ROUNDS; i++){
-            // std::cout<<"\n";
             std::cout<<"Running iteration "<<i+1<<"\n";
             run();
             std::cout<<"\n";
@@ -33,8 +27,6 @@ public:
                 this->algorithmInstance->refresh();
             }
         }
-        displayMetrics();
-        writeMetrics("metrics.csv");
     }
     std::unique_ptr<BanditAlgorithm<RewardTemplate>> constructAlgorithm(){
         std::string mode;
@@ -43,7 +35,7 @@ public:
         int ARMS; 
         std::cout<<"Enter number of arms: ";
         std::cin>>ARMS; 
-        if(mode == "UA"||mode == "SR"||mode == "UCB"){    
+        if(mode == "UA"||mode == "SR"||mode == "UCB"||mode=="SH"){    
             int BUDGET;
             std::cout<<"Enter budget: ";
             std::cin>>BUDGET;
@@ -61,6 +53,10 @@ public:
                 std::cin>>a;
                 std::cout<<"\n";
                 return std::make_unique<UCB_2<>>(ARMS, BUDGET, this->generator, a, true);
+            }
+            else if(mode=="SH"){
+                std::cout<<"\n";
+                return std::make_unique<SequentialHalving<>>(ARMS, BUDGET, this->generator, true);
             }
         }
         else if(mode == "ME"||mode == "EGE"){
@@ -87,19 +83,13 @@ public:
         return std::make_unique<ExponentialGapElimination<>>(10, this->generator, 0.1, true);
     }
     void run(){
-        this->algorithmInstance->run();
-        Metrics<RewardTemplate> metrics = this->algorithmInstance->evaluate();
-
-        this->metricsList.push_back(metrics);
-    }
-    void displayMetrics(){
-        for(Metrics<RewardTemplate> metrics: this->metricsList){
-            metrics.display();
+        int error = this->algorithmInstance->run();
+        if(!error){
+            Metrics<RewardTemplate> metrics = this->algorithmInstance->evaluate();
+            writeMetric(metrics, "metrics.csv");
         }
     }
-
-    void writeMetrics(std::string filename){
-        
+    void writeMetric(Metrics<RewardTemplate> metrics, std::string filename){
         bool isEmpty = false;
         std::ifstream infile(filename);
         if (infile.peek() == std::ifstream::traits_type::eof()) {
@@ -112,10 +102,32 @@ public:
             std::cout<<"Failed to open file\n";
             return;
         }
-        if(isEmpty)file<<"Optimal Mean,Regret,H1,Pulls\n";
-        for(Metrics<RewardTemplate> metrics: this->metricsList){
-            file<<metrics.optimalMean<<","<<metrics.regret<<","<<metrics.H1<<","<<metrics.pulls<<"\n";
+        if(isEmpty)file<<"Algorithm,Metadata,Rundata,Pulls\n";
+        
+        file<<"\""<<metrics.algorithm<<"\",";
+        
+        int count = metrics.algorithmMetadata.size();
+        int c = 0; 
+        file<<"\"{";
+        for(std::pair<std::string,RewardTemplate> i: metrics.algorithmMetadata){
+            file<<"\\\""<<i.first<<"\\\""<<":"<<i.second;
+            if(c!=count-1)file<<",";
+            c++;
         }
+        file<<"}\",";
+        
+        count = metrics.algorithmRunMetadata.size();
+        c = 0; 
+        file<<"\"{";
+        for(std::pair<std::string,RewardTemplate> i: metrics.algorithmRunMetadata){
+            file<<"\\\""<<i.first<<"\\\""<<":"<<i.second;
+            if(c!=count-1)file<<",";
+            c++;
+        }
+        file<<"}\",";
+
+        file<<metrics.pulls<<"\n";
+
         file.close();
     }
 };

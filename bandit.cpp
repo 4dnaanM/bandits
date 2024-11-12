@@ -10,7 +10,7 @@
 template <typename RewardTemplate = double>
 class BanditAlgorithm{
 public:
-    virtual void run() = 0;
+    virtual int run() = 0;
     virtual void refresh() = 0;
     virtual Metrics<RewardTemplate> evaluate() = 0;
     virtual ~BanditAlgorithm() = default;
@@ -57,7 +57,7 @@ public:
         return localArms;
     }
     
-    virtual void run() override {
+    virtual int run() override {
         if(!this->silent)std::cout<<"\n";
         for(int i = 0; i< this->BUDGET; i++){
             if(!this->silent)std::cout<<"ROUND: "<<i<<" | ";
@@ -67,6 +67,7 @@ public:
             if(!this->silent)selectedArm.printReward(reward);
         }
         if(!this->silent)std::cout<<"\n";
+        return 0;
     }
 
     virtual ArmTemplate findBestArm(){
@@ -82,9 +83,16 @@ public:
         ArmTemplate bestArm = findBestArm();
         if(!this->silent)std::cout<<"Empirical Best Arm: "<<bestArm.id<<"\n";
         return Metrics<RewardTemplate>(
-            this->evaluatorInstance.optimalArm.getMean(),
-            this->evaluatorInstance.evaluateRegret(bestArm),
-            this->evaluatorInstance.H1,
+            "Fixed Budget",
+            std::unordered_map<std::string,RewardTemplate>({
+                {"Arms",this->ARMS},
+                {"Budget",this->BUDGET}
+            }),
+            std::unordered_map<std::string,RewardTemplate>({
+                {"Optimal Mean",this->evaluatorInstance.optimalArm.getMean()},
+                {"Regret",this->evaluatorInstance.evaluateRegret(bestArm)},
+                {"H1",this->evaluatorInstance.H1}
+            }),
             this->totalPulls
         );
     }
@@ -110,7 +118,7 @@ public:
         int worstArmIndex = std::min_element(averageRewards.begin(),averageRewards.end(),[](std::pair<const int,RewardTemplate>& a, std::pair<const int,RewardTemplate>& b){return a.second < b.second;})->first;
         return this->arms.find(worstArmIndex)->second;
     }
-    void run() override {
+    int run() override {
         if(!this->silent)std::cout<<"\n";
         for(int PHASE = 1; PHASE <= this->ARMS -1; PHASE++){
             int length = ceil(this->C/this->arms.size())-((PHASE>1)?ceil(this->C/(this->arms.size()+1)):0);
@@ -135,26 +143,43 @@ public:
             if(!this->silent)std::cout<<"Removed Worst Arm: "<<worstArm.id<<"\n";
             if(!this->silent)std::cout<<"\n";
         }
+        return 0;
     }
     Metrics<RewardTemplate> evaluate() override {
         if(this->arms.size()>1){
             ArmTemplate bestArm = this->findBestArm();
             if(!this->silent)std::cout<<"There are multiple Arms left! Empirical best Arm: "<<bestArm.id<<"\n";
             return Metrics<RewardTemplate>(
-                this->evaluatorInstance.optimalArm.getMean(),
-                this->evaluatorInstance.evaluateRegret(bestArm),
-                this->evaluatorInstance.H1,
+                "Successive Rejects",
+                std::unordered_map<std::string,RewardTemplate>({
+                    {"Arms",this->ARMS},
+                    {"Budget",this->BUDGET}
+                }),
+                std::unordered_map<std::string,RewardTemplate>({
+                    {"Optimal Mean",this->evaluatorInstance.optimalArm.getMean()},
+                    {"Regret",this->evaluatorInstance.evaluateRegret(bestArm)},
+                    {"H1",this->evaluatorInstance.H1}
+                }),
+            this->totalPulls
+            );
+        }
+        else{
+            ArmTemplate bestArm = this->arms.begin()->second;
+            if(!this->silent)std::cout<<"Final Remaining Arm: "<<bestArm.id<<"\n";
+            return Metrics<RewardTemplate>(
+                "Successive Rejects",
+                std::unordered_map<std::string,RewardTemplate>({
+                    {"Arms",this->ARMS},
+                    {"Budget",this->BUDGET}
+                }),
+                std::unordered_map<std::string,RewardTemplate>({
+                    {"Optimal Mean",this->evaluatorInstance.optimalArm.getMean()},
+                    {"Regret",this->evaluatorInstance.evaluateRegret(bestArm)},
+                    {"H1",this->evaluatorInstance.H1},
+                }),
                 this->totalPulls
             );
         }
-        ArmTemplate bestArm = this->arms.begin()->second;
-        if(!this->silent)std::cout<<"Final Remaining Arm: "<<bestArm.id<<"\n";
-        return Metrics<RewardTemplate>(
-            this->evaluatorInstance.optimalArm.getMean(),
-            this->evaluatorInstance.evaluateRegret(bestArm),
-            this->evaluatorInstance.H1, 
-            this->totalPulls
-        );
     }
 };
 
@@ -174,7 +199,7 @@ public:
         if(!this->silent)std::cout<<"Selected Arm: "<<bestArmIndex<<" | ";
         return this->arms.find(bestArmIndex)->second;
     }
-    void run() override {
+    int run() override {
         if(!this->silent)std::cout<<"\n";
         for(int i = 0; i< this->BUDGET; i++){
             if(!this->silent)std::cout<<"ROUND: "<<i<<" | ";
@@ -183,6 +208,24 @@ public:
             if(!this->silent)selectedArm.printReward(reward);
         }
         if(!this->silent)std::cout<<"\n";
+        return 0; 
+    }
+    Metrics<RewardTemplate> evaluate() override {
+        ArmTemplate bestArm = this->findBestArm();
+        if(!this->silent)std::cout<<"Empirical Best Arm: "<<bestArm.id<<"\n";
+        return Metrics<RewardTemplate>(
+            "Upper Confidence Bound 2",
+            std::unordered_map<std::string,RewardTemplate>({
+                {"Arms",this->ARMS},
+                {"a",this->a}
+            }),
+            std::unordered_map<std::string,RewardTemplate>({
+                {"Optimal Mean",this->evaluatorInstance.optimalArm.getMean()},
+                {"Regret",this->evaluatorInstance.evaluateRegret(bestArm)},
+                {"H1",this->evaluatorInstance.H1}
+            }),
+            this->totalPulls
+        );
     }
 };
 
@@ -226,7 +269,7 @@ public:
         return localArms;
     }
     
-    virtual void run() override = 0;
+    virtual int run() override = 0;
 
     virtual ArmTemplate findBestArm(){
         std::map<int,RewardTemplate> averageRewards;
@@ -241,9 +284,16 @@ public:
         ArmTemplate bestArm = findBestArm();
         if(!this->silent)std::cout<<"Empirical Best Arm: "<<bestArm.id<<"\n";
         return Metrics<RewardTemplate>(
-            this->evaluatorInstance.optimalArm.getMean(),
-            this->evaluatorInstance.evaluateRegret(bestArm),
-            this->evaluatorInstance.H1,
+            "Fixed Confidence",
+            std::unordered_map<std::string,RewardTemplate>({
+                {"Arms",this->ARMS},
+                {"Confidence",this->delta}
+            }),
+            std::unordered_map<std::string,RewardTemplate>({
+                {"Optimal Mean",this->evaluatorInstance.optimalArm.getMean()},
+                {"Regret",this->evaluatorInstance.evaluateRegret(bestArm)},
+                {"H1",this->evaluatorInstance.H1}
+            }),
             this->totalPulls
         );
     }
@@ -293,12 +343,14 @@ public:
         }
         if(!this->silent)std::cout<<"\n";
     }        
-    void run() override {
+    int run() override {
         RewardTemplate e = this->epsilon/4; 
         double d = this->delta/2;
         
         while(this->arms.size()>1){
-            int length = ceil(4*log(3/d)/(e*e));
+            if(!this->silent)std::cout<<"e: "<<e<<" | d: "<<d<<"\n";
+            int length = ceil(4/(e*e*log(3/d)));
+            // int length = ceil(4*log(3/d)/(e*e));
             if(!this->silent)std::cout<<"Phase with length "<<length<<"*"<<this->arms.size()<<" = "<<length*this->arms.size()<<"\n";
             this->totalPulls+=length*this->arms.size();
             
@@ -313,6 +365,7 @@ public:
             if(!this->silent)std::cout<<"\n";
         }
         std::cout<<"Total Pulls: "<<this->totalPulls<<"\n";
+        return 0;
     }
     Metrics<RewardTemplate> evaluate() override {
         ArmTemplate bestArm = this->findBestArm();
@@ -323,9 +376,17 @@ public:
             if(!this->silent)std::cout<<"Final Remaining Arm: "<<bestArm.id<<"\n";
         }
         return Metrics<RewardTemplate>(
-            this->evaluatorInstance.optimalArm.getMean(),
-            this->evaluatorInstance.evaluateRegret(bestArm),
-            this->evaluatorInstance.H1, 
+            "Median Elimination",
+            std::unordered_map<std::string,RewardTemplate>({
+                {"Arms",this->ARMS},
+                {"Confidence",this->delta},
+                {"Approximation",this->epsilon}
+            }),
+            std::unordered_map<std::string,RewardTemplate>({
+                {"Optimal Mean",this->evaluatorInstance.optimalArm.getMean()},
+                {"Regret",this->evaluatorInstance.evaluateRegret(bestArm)},
+                {"H1",this->evaluatorInstance.H1}
+            }),
             this->totalPulls
         );
     }
@@ -371,7 +432,7 @@ public:
         double d = delta/2;
         
         while(arms.size()>1){
-            int length = ceil(4*log(3/d)/(e*e));
+            int length = ceil(4/(e*e*log(3/d)));
             this->totalPulls+=length*arms.size();
             this->medianPulls+=length*arms.size();
             if(length==0)break;
@@ -398,7 +459,11 @@ public:
         }
         return arms.begin()->first;
     }
-    void run() override {
+    int run() override {
+        if(this->evaluatorInstance.H1>10000){
+            std::cout<<"H1 is too large for Exponential Gap Elimination! Returning\n";
+            return 1;
+        }
         int round = 1;
         while(this->arms.size()>1){
             RewardTemplate e = pow(2,-1*round)/4; 
@@ -410,6 +475,7 @@ public:
             if(length==0)break; 
             if(!this->silent)std::cout<<"Sampling for "<<length<<"*"<<this->arms.size()<<" = "<<length*this->arms.size()<<" rounds each \n";
             sampleArms(length);
+            if(!this->silent)std::cout<<"Running Median Elimination with e: "<<e<<" and d: "<<d<<"\n";
             int optArm = medianElimination(e/2,d);
             RewardTemplate optReward = this->armSelectorInstance.totalPulls[optArm]>0? this->armSelectorInstance.totalRewards[optArm]/this->armSelectorInstance.totalPulls[optArm]: INT_MAX;
             if(!this->silent)std::cout<<"Optimal Arm: "<<optArm<<" with Average Reward: "<<optReward<<"\n";
@@ -421,6 +487,7 @@ public:
         std::cout<<"Total Pulls: "<<this->totalPulls<<" | ";
         std::cout<<"MedianElimination Pulls: "<<this->medianPulls<<" | ";
         std::cout<<"EGElimination Pulls: "<<this->totalPulls-this->medianPulls<<"\n"; 
+        return 0;
     }
     Metrics<RewardTemplate> evaluate() override {
         ArmTemplate bestArm = this->findBestArm();
@@ -431,13 +498,110 @@ public:
             if(!this->silent)std::cout<<"Final Remaining Arm: "<<bestArm.id<<"\n";
         }
         Metrics<RewardTemplate> metrics(
-            this->evaluatorInstance.optimalArm.getMean(),
-            this->evaluatorInstance.evaluateRegret(bestArm),
-            this->evaluatorInstance.H1,
+            "Exponential Gap Elimination",
+            std::unordered_map<std::string,RewardTemplate>({
+                {"Arms",this->ARMS},
+                {"Confidence",this->delta}
+            }),
+            std::unordered_map<std::string,RewardTemplate>({
+                {"Optimal Mean",this->evaluatorInstance.optimalArm.getMean()},
+                {"Regret",this->evaluatorInstance.evaluateRegret(bestArm)},
+                {"H1",this->evaluatorInstance.H1}
+            }),
             this->totalPulls
         );
         this->totalPulls = 0; 
         this->medianPulls = 0;
         return metrics;
+    }
+};
+
+template <typename RewardTemplate = double, typename ArmTemplate = BernoulliArm<RewardTemplate>, typename AllocatorTemplate = UniformAllocator<RewardTemplate,ArmTemplate>, typename EvaluatorTemplate = DeltaEvaluator<RewardTemplate,ArmTemplate>>
+class SequentialHalving: public fixedBudget<RewardTemplate,ArmTemplate,AllocatorTemplate,EvaluatorTemplate>{
+public: 
+    SequentialHalving(int ARMS, int BUDGET, std::mt19937& generator, bool silent=false): fixedBudget<RewardTemplate,ArmTemplate,AllocatorTemplate,EvaluatorTemplate>(ARMS,BUDGET,generator,silent) {
+    }
+    void sampleArms(int length){
+        for(auto p: this->arms){
+            int id = p.first; 
+            ArmTemplate arm = p.second;
+            for(int i = 0; i< length; i++){
+                RewardTemplate reward = this->armSelectorInstance.playArm(arm);
+            }
+        }
+    }
+    std::vector<int> findBottomHalf(){
+        std::vector<std::pair<int, RewardTemplate>> averageRewards;
+        for (auto p : this->arms) {
+            int id = p.first;
+            RewardTemplate avgReward = this->armSelectorInstance.totalPulls[id] > 0 ? this->armSelectorInstance.totalRewards[id] / this->armSelectorInstance.totalPulls[id] : INT_MIN;
+            averageRewards.push_back({id, avgReward});
+        }
+        std::sort(averageRewards.begin(), averageRewards.end(), [](const std::pair<int, RewardTemplate>& a, const std::pair<int, RewardTemplate>& b) {
+            return a.second < b.second;
+        });
+        std::vector<int> bottomHalf;
+        for(int i = 0; i<this->arms.size()/2; i++){
+            bottomHalf.push_back(averageRewards[i].first);
+        }
+        return bottomHalf;
+    }
+    int run() override {
+        if(!this->silent)std::cout<<"\n";
+        int rounds = ceil(log2(this->ARMS));
+        for(int round = 0; round< rounds; round++){
+            int lenRound = floor(this->BUDGET/(this->arms.size()*rounds));
+            if(!this->silent)std::cout<<"Sampling for "<<lenRound<<"="<<this->BUDGET/rounds<<"/"<<this->arms.size()<<" rounds each \n";
+            this->sampleArms(lenRound);
+            this->totalPulls+=lenRound*this->arms.size();
+            std::vector<int> bottomHalf = this->findBottomHalf();
+
+            if(!this->silent)std::cout<<"Removed Arms: ";
+            for (int id: bottomHalf){
+                this->arms.erase(id);
+                if(!this->silent)std::cout<<id<<" ";
+            }
+            if(!this->silent)std::cout<<"\n";    
+        } 
+        if(!this->silent)std::cout<<"Total Pulls: "<<this->totalPulls<<"\n";
+        if(!this->silent)std::cout<<"Remaining Arms: "<<this->arms.size()<<"\n";
+        
+        return 0;
+    }
+    Metrics<RewardTemplate> evaluate() override {
+        if(this->arms.size()>1){
+            ArmTemplate bestArm = this->findBestArm();
+            if(!this->silent)std::cout<<"There are multiple Arms left! Empirical best Arm: "<<bestArm.id<<"\n";
+            return Metrics<RewardTemplate>(
+                "Sequential Halving",
+                std::unordered_map<std::string,RewardTemplate>({
+                    {"Arms",this->ARMS},
+                    {"Budget",this->BUDGET}
+                }),
+                std::unordered_map<std::string,RewardTemplate>({
+                    {"Optimal Mean",this->evaluatorInstance.optimalArm.getMean()},
+                    {"Regret",this->evaluatorInstance.evaluateRegret(bestArm)},
+                    {"H1",this->evaluatorInstance.H1}
+                }),
+            this->totalPulls
+            );
+        }
+        else{
+            ArmTemplate bestArm = this->arms.begin()->second;
+            if(!this->silent)std::cout<<"Final Remaining Arm: "<<bestArm.id<<"\n";
+            return Metrics<RewardTemplate>(
+                "Sequential Halving",
+                std::unordered_map<std::string,RewardTemplate>({
+                    {"Arms",this->ARMS},
+                    {"Budget",this->BUDGET}
+                }),
+                std::unordered_map<std::string,RewardTemplate>({
+                    {"Optimal Mean",this->evaluatorInstance.optimalArm.getMean()},
+                    {"Regret",this->evaluatorInstance.evaluateRegret(bestArm)},
+                    {"H1",this->evaluatorInstance.H1},
+                }),
+                this->totalPulls
+            );
+        }
     }
 };
